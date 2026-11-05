@@ -1,12 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { getDraftForTicket } from "@/server/ai";
-import { setLLMClientOverrides } from "@/server/ai/llm-client";
-import { LLMError, type LLMProvider, type LLMRequest } from "@/server/ai/providers/llm-provider";
-import { flushUsageLogs } from "@/server/ai/usage-logger";
+import { setLLMClientOverrides } from "@/server/ai/llmClient";
+import { LLMError, type LLMProvider, type LLMRequest } from "@/server/ai/providers/llmProvider";
+import { flushUsageLogs } from "@/server/ai/usageLogger";
 import { AiDraft, AiUsageLog, Book, Ticket, User } from "@/server/db/models";
 import { startTestDb, stopTestDb } from "../helpers/test-db";
 
-const REPLY =
+const fakeReplyText =
   "Hi Ananya,\n\nThank you for raising this, and I am truly sorry. Your royalty of ₹2,546 is overdue and that is on us. I have escalated it to our finance team today and we will update you within 48 hours.\n\nWarm regards,\nInkwell Publishing Author Support";
 
 function fakeDraftProvider() {
@@ -17,7 +17,7 @@ function fakeDraftProvider() {
     modelFor: () => "fake-large",
     async generate(req) {
       requests.push(req);
-      return { text: REPLY, inputTokens: 1800, outputTokens: 220, model: "fake-large" };
+      return { text: fakeReplyText, inputTokens: 1800, outputTokens: 220, model: "fake-large" };
     },
   };
   return { p, requests };
@@ -76,7 +76,7 @@ describe("getDraftForTicket (integration)", () => {
     const before = await usageCount();
 
     const first = await getDraftForTicket(ticketId);
-    expect(first).toMatchObject({ status: "READY", cached: false, model: "fake-large", content: REPLY });
+    expect(first).toMatchObject({ status: "READY", cached: false, model: "fake-large", content: fakeReplyText });
     expect(await usageCount()).toBe(before + 1);
 
     // The prompt is grounded: computed facts + only the royalty KB section + delimiters.
@@ -93,7 +93,7 @@ describe("getDraftForTicket (integration)", () => {
     expect(draft).toMatchObject({ basedOnMessageCount: 0, promptVersion: "draft-v1", provider: "fake", inputTokens: 1800 });
 
     const second = await getDraftForTicket(ticketId);
-    expect(second).toMatchObject({ status: "READY", cached: true, content: REPLY });
+    expect(second).toMatchObject({ status: "READY", cached: true, content: fakeReplyText });
     expect(await usageCount()).toBe(before + 1); // zero tokens spent
 
     const author = await User.findOne({ "authorProfile.code": "AUTH003" }).lean();

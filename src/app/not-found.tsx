@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FileQuestion } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import { ROUTES } from "@/constants/routes";
+import { buttonVariants } from "@/components/ui/Button";
+import { routes } from "@/constants/routes";
 
 export default function NotFound() {
   return (
@@ -13,7 +13,7 @@ export default function NotFound() {
           The page you were looking for doesn&apos;t exist or has moved.
         </p>
       </div>
-      <Link href={ROUTES.home} className={buttonVariants({ variant: "outline" })}>
+      <Link href={routes.home} className={buttonVariants({ variant: "outline" })}>
         Back to AuthorDesk
       </Link>
     </main>

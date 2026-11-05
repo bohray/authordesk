@@ -1,7 +1,7 @@
 import "server-only";
 import { Types } from "mongoose";
 import { classifyTicket } from "@/server/ai";
-import { GENERAL_BOOK_OPTION } from "@/shared/constants/ticket";
+import { generalBookOption } from "@/shared/constants/ticket";
 import type { CreateMessageInput, CreateTicketInput } from "@/shared/schemas/ticket.schema";
 import type { AuthorTicketDTO } from "@/shared/types/dto";
 import type { Session } from "../auth/session";
@@ -9,7 +9,7 @@ import { nextSequence } from "../db/models";
 import { Errors } from "../http/errors";
 import { toAuthorTicketDTO } from "../mappers/ticket.mapper";
 import { findBookForAuthor } from "../repositories/book.repository";
-import { recordEvents } from "../repositories/ticket-event.repository";
+import { recordEvents } from "../repositories/ticketEvent.repository";
 import {
   createTicket,
   findTicketForAuthor,
@@ -37,7 +37,7 @@ export async function getMyTicket(session: Session, ticketId: string): Promise<A
 
 export async function createMyTicket(session: Session, input: CreateTicketInput): Promise<AuthorTicketDTO> {
   let book: { id: Types.ObjectId; title: string; isbn: string } | null = null;
-  if (input.bookId !== GENERAL_BOOK_OPTION) {
+  if (input.bookId !== generalBookOption) {
     const found = await findBookForAuthor(input.bookId, session.userId);
     if (!found) {
       throw Errors.validation([

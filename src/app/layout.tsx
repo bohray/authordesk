@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Source_Serif_4 } from "next/font/google";
-import { AppProviders } from "@/providers/app-providers";
+import { AppProviders } from "@/providers/AppProviders";
 import "./globals.css";
 
 const uiSans = Geist({

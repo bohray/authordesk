@@ -1,14 +1,14 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { BookMarked, Inbox, Sparkles } from "lucide-react";
-import { LoginForm } from "@/features/auth/components/login-form";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Wordmark } from "@/components/brand/logo";
-import { ThemeToggle } from "@/components/brand/theme-toggle";
+import { LoginForm } from "@/features/auth/components/LoginForm";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Wordmark } from "@/components/brand/Logo";
+import { ThemeToggle } from "@/components/brand/ThemeToggle";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-const POINTS = [
+const points = [
   { Icon: BookMarked, text: "Books, sales and royalties in one calm place" },
   { Icon: Sparkles, text: "Tickets triaged by AI, answered by real people" },
   { Icon: Inbox, text: "A live queue built for the operations team" },
@@ -37,7 +37,7 @@ export default function LoginPage() {
             Support for every author, <span className="text-primary italic">at scale.</span>
           </p>
           <ul className="mt-[56px] flex flex-col gap-[28px] text-sm leading-[28px] text-muted-foreground">
-            {POINTS.map(({ Icon, text }) => (
+            {points.map(({ Icon, text }) => (
               <li key={text} className="flex h-[28px] items-center gap-3">
                 <span className="flex size-[28px] shrink-0 items-center justify-center rounded-md bg-card text-primary shadow-card ring-1 ring-border">
                   <Icon className="size-3.5" aria-hidden />

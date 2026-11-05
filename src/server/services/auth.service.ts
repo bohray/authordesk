@@ -5,11 +5,11 @@ import type { SessionClaims } from "../auth/jwt";
 import { hashPassword, verifyPassword } from "../auth/password";
 import type { Session } from "../auth/session";
 import { Errors } from "../http/errors";
-import { assertLoginAllowed, clearLoginFailures, recordLoginFailure } from "../lib/rate-limit";
+import { assertLoginAllowed, clearLoginFailures, recordLoginFailure } from "../lib/rateLimit";
 import { toSessionUserDTO } from "../mappers/user.mapper";
 import { findUserByEmailWithPassword, findUserById } from "../repositories/user.repository";
 
-const INVALID_CREDENTIALS = "Invalid email or password";
+const invalidCredentials = "Invalid email or password";
 
 // Compared against when the email is unknown, so both paths cost one bcrypt check and
 // response timing doesn't reveal which emails have accounts.
@@ -24,7 +24,7 @@ export async function login(input: LoginInput): Promise<{ user: SessionUserDTO; 
 
   if (!user || !valid) {
     await recordLoginFailure(input.email);
-    throw Errors.unauthenticated(INVALID_CREDENTIALS);
+    throw Errors.unauthenticated(invalidCredentials);
   }
 
   await clearLoginFailures(input.email);

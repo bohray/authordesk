@@ -1,4 +1,4 @@
-import { NewTicketPageSkeleton } from "@/features/tickets/components/ticket-skeletons";
+import { NewTicketPageSkeleton } from "@/features/tickets/components/TicketSkeletons";
 
 export default function Loading() {
   return <NewTicketPageSkeleton />;

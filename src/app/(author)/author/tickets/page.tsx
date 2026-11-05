@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { TicketList } from "@/features/tickets/components/ticket-list";
+import { TicketList } from "@/features/tickets/components/TicketList";
 
 export const metadata: Metadata = { title: "My Tickets" };
 

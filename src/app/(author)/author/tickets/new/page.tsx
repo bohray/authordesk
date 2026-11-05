@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { NewTicketForm } from "@/features/tickets/components/new-ticket-form";
-import { NewTicketPageSkeleton } from "@/features/tickets/components/ticket-skeletons";
+import { NewTicketForm } from "@/features/tickets/components/NewTicketForm";
+import { NewTicketPageSkeleton } from "@/features/tickets/components/TicketSkeletons";
 
 export const metadata: Metadata = { title: "New Ticket" };
 

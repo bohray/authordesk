@@ -1,5 +1,5 @@
 import { clearSessionCookie } from "@/server/auth/session";
-import { withApi } from "@/server/http/with-api";
+import { withApi } from "@/server/http/withApi";
 import { noContent } from "@/server/http/responses";
 
 export const runtime = "nodejs";

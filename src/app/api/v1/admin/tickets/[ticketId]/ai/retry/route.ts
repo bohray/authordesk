@@ -1,6 +1,6 @@
-import { withApi } from "@/server/http/with-api";
+import { withApi } from "@/server/http/withApi";
 import { ok } from "@/server/http/responses";
-import { retryClassification } from "@/server/services/admin-ticket.service";
+import { retryClassification } from "@/server/services/adminTicket.service";
 import { ticketIdParamSchema } from "@/shared/schemas/ticket.schema";
 
 export const runtime = "nodejs";

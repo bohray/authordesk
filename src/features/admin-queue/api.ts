@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/api-client";
-import { API_ROUTES } from "@/constants/routes";
-import { PAGE_SIZE } from "@/constants/ui";
+import { apiClient } from "@/lib/apiClient";
+import { apiRoutes } from "@/constants/routes";
+import { pageSize } from "@/constants/ui";
 import type {
   AdminStatsDTO,
   AdminTicketDetailDTO,
@@ -20,20 +20,20 @@ export function toQueueParams(q: AdminQueueQuery) {
     q: q.q.trim() || undefined,
     sort: q.sort,
     page: q.page,
-    limit: PAGE_SIZE,
+    limit: pageSize,
   };
 }
 
 export const adminQueueApi = {
   list: (query: AdminQueueQuery, signal?: AbortSignal) =>
     apiClient.getPaginated<AdminTicketListItemDTO>(
-      API_ROUTES.admin.tickets,
+      apiRoutes.admin.tickets,
       toQueueParams(query),
       signal,
     ),
   stats: (signal?: AbortSignal) =>
-    apiClient.get<AdminStatsDTO>(API_ROUTES.admin.stats, undefined, signal),
+    apiClient.get<AdminStatsDTO>(apiRoutes.admin.stats, undefined, signal),
   /** Ticket detail, used only to prefetch on row hover (shares the detail cache key). */
   detail: (id: string, signal?: AbortSignal) =>
-    apiClient.get<AdminTicketDetailDTO>(API_ROUTES.admin.ticket(id), undefined, signal),
+    apiClient.get<AdminTicketDetailDTO>(apiRoutes.admin.ticket(id), undefined, signal),
 };

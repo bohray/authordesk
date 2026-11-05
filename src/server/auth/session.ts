@@ -1,6 +1,6 @@
 import "server-only";
 import type { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE } from "@/shared/constants/roles";
+import { sessionCookie } from "@/shared/constants/roles";
 import { env } from "../config/env";
 import { signSession, verifySession, type SessionClaims } from "./jwt";
 
@@ -13,7 +13,7 @@ export interface Session {
 }
 
 export async function readSession(req: NextRequest): Promise<Session | null> {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  const token = req.cookies.get(sessionCookie)?.value;
   if (!token) return null;
   const claims = await verifySession(token, env().JWT_SECRET);
   if (!claims) return null;
@@ -29,7 +29,7 @@ export async function readSession(req: NextRequest): Promise<Session | null> {
 export async function setSessionCookie(res: NextResponse, claims: SessionClaims) {
   const { JWT_SECRET, SESSION_TTL_HOURS, NODE_ENV } = env();
   const token = await signSession(claims, JWT_SECRET, SESSION_TTL_HOURS);
-  res.cookies.set(SESSION_COOKIE, token, {
+  res.cookies.set(sessionCookie, token, {
     httpOnly: true, // not readable by JS → XSS can't steal it
     secure: NODE_ENV === "production",
     sameSite: "lax", // blocks cross-site POSTs (CSRF) while allowing normal navigation
@@ -39,5 +39,5 @@ export async function setSessionCookie(res: NextResponse, claims: SessionClaims)
 }
 
 export function clearSessionCookie(res: NextResponse) {
-  res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  res.cookies.set(sessionCookie, "", { httpOnly: true, path: "/", maxAge: 0 });
 }

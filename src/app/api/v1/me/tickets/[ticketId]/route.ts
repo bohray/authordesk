@@ -1,4 +1,4 @@
-import { withApi } from "@/server/http/with-api";
+import { withApi } from "@/server/http/withApi";
 import { ok } from "@/server/http/responses";
 import { getMyTicket } from "@/server/services/ticket.service";
 import { ticketIdParamSchema } from "@/shared/schemas/ticket.schema";

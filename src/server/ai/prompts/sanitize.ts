@@ -3,10 +3,10 @@
  * prompt declares tag content to be DATA. That only works if an author cannot close the tag
  * themselves, so any of our delimiter tags appearing inside user text are neutralised.
  */
-const RESERVED_TAGS = /<\s*\/?\s*(author_message|support_reply|ticket|facts|knowledge_base|guidance|conversation)\b[^>]*>/gi;
+const reservedTags = /<\s*\/?\s*(author_message|support_reply|ticket|facts|knowledge_base|guidance|conversation)\b[^>]*>/gi;
 
 export function neutraliseTags(text: string): string {
-  return text.replace(RESERVED_TAGS, "[tag removed]");
+  return text.replace(reservedTags, "[tag removed]");
 }
 
 /** Truncate on a word boundary and mark it, so the model knows text was cut (cost control). */

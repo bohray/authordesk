@@ -8,9 +8,9 @@ import {
   type LLMRequest,
   type LLMResponse,
   type ModelTier,
-} from "./llm-provider";
+} from "./llmProvider";
 
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
 
 interface GroqChatResponse {
   model?: string;
@@ -48,7 +48,7 @@ export class GroqProvider implements LLMProvider {
 
     let res: Response;
     try {
-      res = await fetch(GROQ_URL, {
+      res = await fetch(groqUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({

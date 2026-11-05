@@ -1,5 +1,5 @@
 import "server-only";
-import { PRIORITY_RANK, type TicketCategory, type TicketPriority, type TicketStatus } from "@/shared/constants/ticket";
+import { priorityRankByLevel, type TicketCategory, type TicketPriority, type TicketStatus } from "@/shared/constants/ticket";
 import { hashPassword } from "../auth/password";
 import { AiDraft, AiUsageLog, Book, Counter, LoginAttempt, Ticket, TicketEvent, TicketNote, User, nextSequence } from "./models";
 
@@ -32,8 +32,8 @@ export interface SampleData {
   }[];
 }
 
-export const DEMO_PASSWORDS = { author: "Author@123", admin: "Admin@123" } as const;
-export const DEMO_ADMINS = [
+export const demoPasswords = { author: "Author@123", admin: "Admin@123" } as const;
+export const demoAdmins = [
   { email: "admin@authordesk.dev", name: "Aisha Verma" },
   { email: "ops@authordesk.dev", name: "Karan Mehta" },
 ];
@@ -51,7 +51,7 @@ interface DemoTicket {
 }
 
 /** Realistic demo tickets so the admin queue isn't empty on first login. */
-const DEMO_TICKETS: DemoTicket[] = [
+const demoTickets: DemoTicket[] = [
   {
     authorCode: "AUTH003",
     bookCode: "BK005",
@@ -161,12 +161,12 @@ export async function seedDatabase(data: SampleData, opts: { withDemoTickets?: b
   ]);
 
   const [authorHash, adminHash] = await Promise.all([
-    hashPassword(DEMO_PASSWORDS.author),
-    hashPassword(DEMO_PASSWORDS.admin),
+    hashPassword(demoPasswords.author),
+    hashPassword(demoPasswords.admin),
   ]);
 
   const admins = await User.insertMany(
-    DEMO_ADMINS.map((a) => ({ ...a, role: "ADMIN", passwordHash: adminHash })),
+    demoAdmins.map((a) => ({ ...a, role: "ADMIN", passwordHash: adminHash })),
   );
 
   const authorIdByCode = new Map<string, string>();
@@ -210,7 +210,7 @@ export async function seedDatabase(data: SampleData, opts: { withDemoTickets?: b
   let ticketCount = 0;
   if (opts.withDemoTickets !== false) {
     const admin = admins[0];
-    for (const t of DEMO_TICKETS) {
+    for (const t of demoTickets) {
       const authorId = authorIdByCode.get(t.authorCode);
       if (!authorId) continue;
       const author = data.authors.find((a) => a.author_id === t.authorCode)!;
@@ -241,7 +241,7 @@ export async function seedDatabase(data: SampleData, opts: { withDemoTickets?: b
         categorySource: "AI",
         priority: t.priority,
         prioritySource: "AI",
-        priorityRank: PRIORITY_RANK[t.priority],
+        priorityRank: priorityRankByLevel[t.priority],
         ai: {
           status: "DONE",
           confidence: 0.9,

@@ -2,7 +2,7 @@ import "server-only";
 import type { BookDTO, MyBooksDTO } from "@/shared/types/dto";
 import { toBookDTO } from "../mappers/book.mapper";
 import { findBooksByAuthor } from "../repositories/book.repository";
-import { PAYOUT_THRESHOLD, nextPayoutDate } from "./royalty-schedule";
+import { payoutThreshold, nextPayoutDate } from "./royaltySchedule";
 
 /** Published books first, then the most recently published; unpublished (null date) last. */
 function compareBooks(a: BookDTO, b: BookDTO) {
@@ -29,6 +29,6 @@ export async function getMyBooks(authorId: string, today = new Date()): Promise<
     books,
     totals,
     nextPayoutDate: nextPayoutDate(today),
-    payoutThreshold: PAYOUT_THRESHOLD,
+    payoutThreshold,
   };
 }

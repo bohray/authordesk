@@ -10,7 +10,7 @@ export interface ResponseGuidance {
   guidance: string;
 }
 
-export const RESPONSE_GUIDANCE: Record<TicketCategory, ResponseGuidance[]> = {
+export const responseGuidance: Record<TicketCategory, ResponseGuidance[]> = {
   ROYALTY_PAYMENTS: [
     {
       query: "Published 4 months ago, no royalty yet.",

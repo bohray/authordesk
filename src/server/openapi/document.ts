@@ -6,7 +6,7 @@ import {
   type RouteConfig,
 } from "@asteasolutions/zod-to-openapi";
 import { z, type ZodType } from "zod";
-import { SESSION_COOKIE } from "@/shared/constants/roles";
+import { sessionCookie } from "@/shared/constants/roles";
 import { loginSchema } from "@/shared/schemas/auth.schema";
 import {
   adminTicketQuerySchema,
@@ -18,7 +18,7 @@ import {
   updatesQuerySchema,
 } from "@/shared/schemas/ticket.schema";
 import { authorTicketQuerySchema } from "../services/schemas";
-import * as R from "./response-schemas";
+import * as R from "./responseSchemas";
 
 /**
  * OpenAPI 3.0 document generated from the same Zod schemas the API validates with,
@@ -38,7 +38,7 @@ function build() {
   registry.registerComponent("securitySchemes", "cookieAuth", {
     type: "apiKey",
     in: "cookie",
-    name: SESSION_COOKIE,
+    name: sessionCookie,
     description: "httpOnly session JWT set by POST /auth/login.",
   });
 
@@ -57,7 +57,7 @@ function build() {
   const Updates = registry.register("Updates", R.UpdatesSchema);
   const Meta = registry.register("PaginationMeta", R.PaginationMetaSchema);
 
-  // Shared schemas were built before Zod was extended (see response-schemas.ts), so they
+  // Shared schemas were built before Zod was extended (see responseSchemas.ts), so they
   // are cloned to gain `.openapi()`. Validation, refinements and transforms are unchanged.
   const LoginRequest = registry.register("LoginRequest", loginSchema.clone());
   const CreateTicketRequest = registry.register("CreateTicketRequest", createTicketSchema.clone());

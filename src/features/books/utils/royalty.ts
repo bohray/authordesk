@@ -1,5 +1,5 @@
 import { formatDate, formatINR } from "@/lib/format";
-import { MESSAGES } from "@/constants/messages";
+import { uiMessages } from "@/constants/messages";
 import type { BookDTO, MyBooksDTO } from "@/shared/types/dto";
 
 export type NoteTone = "info" | "warn" | "muted";
@@ -11,15 +11,15 @@ export interface RoyaltyNote {
 /** Per-book explanatory notes for the edge cases authors ask support about most. */
 export function getRoyaltyNotes(book: BookDTO, threshold: number): RoyaltyNote[] {
   if (!book.isPublished) {
-    return [{ tone: "info", text: MESSAGES.books.inProductionNote }];
+    return [{ tone: "info", text: uiMessages.books.inProductionNote }];
   }
   const notes: RoyaltyNote[] = [];
   const { pending, paid, lastPayoutDate } = book.royalty;
   if (pending > 0 && pending < threshold) {
-    notes.push({ tone: "warn", text: MESSAGES.books.belowThreshold(formatINR(threshold)) });
+    notes.push({ tone: "warn", text: uiMessages.books.belowThreshold(formatINR(threshold)) });
   }
   if (paid === 0 && !lastPayoutDate) {
-    notes.push({ tone: "muted", text: MESSAGES.books.neverPaid });
+    notes.push({ tone: "muted", text: uiMessages.books.neverPaid });
   }
   return notes;
 }

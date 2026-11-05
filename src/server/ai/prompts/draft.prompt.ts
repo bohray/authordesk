@@ -1,16 +1,16 @@
 import type { TicketCategory } from "@/shared/constants/ticket";
-import { TICKET_CATEGORY_LABELS } from "@/shared/constants/ticket";
+import { ticketCategoryLabels } from "@/shared/constants/ticket";
 import { knowledgeForCategory, toneGuidelines } from "../knowledge-base";
 import type { PublisherNames } from "../knowledge-base/publisher";
 import { neutraliseTags, truncate, wrapAuthorText } from "./sanitize";
 
-export const DRAFT_PROMPT_VERSION = "draft-v1";
-export const DRAFT_MAX_OUTPUT_TOKENS = 600;
-export const DRAFT_TEMPERATURE = 0.4;
+export const draftPromptVersion = "draft-v1";
+export const draftMaxOutputTokens = 600;
+export const draftTemperature = 0.4;
 /** Only the tail of the thread matters for the next reply; older turns cost tokens for little gain. */
-export const DRAFT_MAX_MESSAGES = 4;
-export const DRAFT_MAX_MESSAGE_CHARS = 800;
-export const DRAFT_MAX_DESCRIPTION_CHARS = 1500;
+export const draftMaxMessages = 4;
+export const draftMaxMessageChars = 800;
+export const draftMaxDescriptionChars = 1500;
 
 /**
  * Layer 1, fully static per publisher (no ticket data), placed first so provider-side
@@ -63,13 +63,13 @@ export function buildDraftUserPrompt(input: DraftPromptInput): string {
     .map((g) => `Example query: "${g.query}"\nHow to respond: ${g.guidance}`)
     .join("\n\n");
 
-  const tail = input.messages.slice(-DRAFT_MAX_MESSAGES);
+  const tail = input.messages.slice(-draftMaxMessages);
   const omitted = input.messages.length - tail.length;
   const convo = tail
     .map((m) =>
       m.role === "AUTHOR"
-        ? `Author follow-up:\n${wrapAuthorText(m.body, DRAFT_MAX_MESSAGE_CHARS)}`
-        : `Our previous reply:\n<support_reply>\n${neutraliseTags(truncate(m.body, DRAFT_MAX_MESSAGE_CHARS))}\n</support_reply>`,
+        ? `Author follow-up:\n${wrapAuthorText(m.body, draftMaxMessageChars)}`
+        : `Our previous reply:\n<support_reply>\n${neutraliseTags(truncate(m.body, draftMaxMessageChars))}\n</support_reply>`,
     )
     .join("\n\n");
 
@@ -78,7 +78,7 @@ export function buildDraftUserPrompt(input: DraftPromptInput): string {
     ? "Write the reply to the author's original ticket above."
     : "Write the reply to the author's most recent follow-up message, taking the earlier conversation into account and not repeating what our previous replies already said.";
 
-  return `<knowledge_base category="${TICKET_CATEGORY_LABELS[input.category]}">
+  return `<knowledge_base category="${ticketCategoryLabels[input.category]}">
 ${kb.overview}
 
 ${kb.sections.join("\n\n")}
@@ -97,7 +97,7 @@ Ticket subject:
 ${wrapAuthorText(input.subject, 200)}
 
 Original ticket:
-${wrapAuthorText(input.description, DRAFT_MAX_DESCRIPTION_CHARS)}${omitted > 0 ? `\n\n(${omitted} earlier message(s) omitted.)` : ""}${convo ? `\n\n${convo}` : ""}
+${wrapAuthorText(input.description, draftMaxDescriptionChars)}${omitted > 0 ? `\n\n(${omitted} earlier message(s) omitted.)` : ""}${convo ? `\n\n${convo}` : ""}
 </conversation>
 
 ${instruction} Follow the hard rules. Output only the reply text.`;

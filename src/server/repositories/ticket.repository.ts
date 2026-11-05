@@ -1,7 +1,7 @@
 import "server-only";
 import { Types, type PipelineStage, type UpdateQuery } from "mongoose";
 import {
-  UNRESOLVED_STATUSES,
+  unresolvedStatuses,
   type TicketCategory,
   type TicketPriority,
   type TicketStatus,
@@ -11,7 +11,7 @@ import type { Id, TicketQueueRecord, TicketRecord } from "./types";
 const oid = (id: Id) => (typeof id === "string" ? new Types.ObjectId(id) : id);
 
 /** Fields an author view needs. Admin-only data is excluded at the query level too. */
-const AUTHOR_PROJECTION = {
+const authorProjection = {
   ticketNumber: 1,
   authorId: 1,
   bookId: 1,
@@ -25,7 +25,7 @@ const AUTHOR_PROJECTION = {
   updatedAt: 1,
 } as const;
 
-export type AuthorTicketRecord = Pick<TicketRecord, keyof typeof AUTHOR_PROJECTION | "_id">;
+export type AuthorTicketRecord = Pick<TicketRecord, keyof typeof authorProjection | "_id">;
 
 export async function createTicket(data: Partial<TicketRecord>): Promise<TicketRecord> {
   const doc = await Ticket.create(data);
@@ -42,14 +42,14 @@ export function ticketExists(id: Id) {
 
 /** Ownership-scoped: another author's ticket is indistinguishable from a missing one. */
 export function findTicketForAuthor(id: Id, authorId: Id) {
-  return Ticket.findOne({ _id: id, authorId }, AUTHOR_PROJECTION).lean<AuthorTicketRecord | null>();
+  return Ticket.findOne({ _id: id, authorId }, authorProjection).lean<AuthorTicketRecord | null>();
 }
 
 export async function listTicketsForAuthor(authorId: Id, skip: number, limit: number) {
   const filter = { authorId };
   // Uses the { authorId, createdAt } index for both the page and the count.
   const [items, total] = await Promise.all([
-    Ticket.find(filter, AUTHOR_PROJECTION)
+    Ticket.find(filter, authorProjection)
       .sort({ createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
@@ -120,11 +120,11 @@ function buildQueueMatch(c: QueueCriteria): Record<string, unknown> {
 }
 
 /** Urgency order within one side (live or done). _id is the tiebreaker so pages are stable. */
-const URGENCY_SORT = { priorityRank: -1, createdAt: 1, _id: 1 } as const;
+const urgencySort = { priorityRank: -1, createdAt: 1, _id: 1 } as const;
 
-const SORTS: Record<QueueCriteria["sort"], Record<string, 1 | -1>> = {
+const sorts: Record<QueueCriteria["sort"], Record<string, 1 | -1>> = {
   // _resolved: 0 for OPEN/IN_PROGRESS, 1 for RESOLVED/CLOSED, so live work always comes first.
-  urgency: { _resolved: 1, ...URGENCY_SORT },
+  urgency: { _resolved: 1, ...urgencySort },
   newest: { createdAt: -1, _id: -1 },
   oldest: { createdAt: 1, _id: 1 },
 };
@@ -137,21 +137,21 @@ const SORTS: Record<QueueCriteria["sort"], Record<string, 1 | -1>> = {
  */
 function needsResolvedKey(statuses: TicketStatus[] | undefined): boolean {
   if (!statuses?.length) return true;
-  const live = statuses.filter((s) => UNRESOLVED_STATUSES.includes(s)).length;
+  const live = statuses.filter((s) => unresolvedStatuses.includes(s)).length;
   return live > 0 && live < statuses.length;
 }
 
 /** One aggregation returns the page and the total, already sorted by urgency rank. */
 export async function queryAdminQueue(c: QueueCriteria) {
   const resolvedKey = c.sort === "urgency" && needsResolvedKey(c.statuses);
-  const sort = c.sort === "urgency" && !resolvedKey ? URGENCY_SORT : SORTS[c.sort];
+  const sort = c.sort === "urgency" && !resolvedKey ? urgencySort : sorts[c.sort];
   const pipeline: PipelineStage[] = [
     { $match: buildQueueMatch(c) },
     ...(resolvedKey
       ? [
           {
             $addFields: {
-              _resolved: { $cond: [{ $in: ["$status", [...UNRESOLVED_STATUSES]] }, 0, 1] },
+              _resolved: { $cond: [{ $in: ["$status", [...unresolvedStatuses]] }, 0, 1] },
             },
           },
         ]
@@ -210,7 +210,7 @@ export interface TicketStatsRaw {
 
 /** All ticket-side dashboard numbers in a single aggregation round trip. */
 export async function getTicketStats(): Promise<TicketStatsRaw> {
-  const unresolved = { status: { $in: [...UNRESOLVED_STATUSES] } };
+  const unresolved = { status: { $in: [...unresolvedStatuses] } };
   const hasSuggestion = { $ne: [{ $ifNull: ["$ai.suggestedCategory", null] }, null] };
   const [res] = await Ticket.aggregate<TicketStatsRaw>([
     {

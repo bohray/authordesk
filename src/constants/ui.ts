@@ -5,29 +5,29 @@ import type {
   TicketStatus,
 } from "@/shared/constants/ticket";
 
-export const APP_NAME = "AuthorDesk";
+export const appName = "AuthorDesk";
 
 /** Live updates poll cadence. */
-export const POLL_INTERVAL_MS = 5000;
+export const pollIntervalMs = 5000;
 /** While AI classification is pending, refetch the ticket detail this often. */
-export const AI_PENDING_REFETCH_MS = 3000;
+export const aiPendingRefetchMs = 3000;
 
-export const PAGE_SIZE = 20;
+export const pageSize = 20;
 /** Authors rarely have many tickets; we fetch a generous page and filter tabs client-side. */
-export const AUTHOR_TICKETS_PAGE_SIZE = 50;
+export const authorTicketsPageSize = 50;
 
-export const SEARCH_DEBOUNCE_MS = 350;
+export const searchDebounceMs = 350;
 
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-export const SUBJECT_MAX = 150;
-export const DESCRIPTION_MAX = 5000;
-export const MESSAGE_MAX = 5000;
+export const maxAttachmentBytes = 10 * 1024 * 1024;
+export const subjectMax = 150;
+export const descriptionMax = 5000;
+export const messageMax = 5000;
 
 /** Age thresholds for unresolved tickets (hours). */
-export const AGE_WARN_HOURS = 24;
-export const AGE_DANGER_HOURS = 48;
+export const ageWarnHours = 24;
+export const ageDangerHours = 48;
 
-export const DEFAULT_PAYOUT_THRESHOLD = 1000;
+export const defaultPayoutThreshold = 1000;
 
 /*
  * Badge tones: soft tint + strong text + subtle inset ring, each with a dark variant.
@@ -55,14 +55,14 @@ const tone = {
     "bg-indigo-50 text-indigo-800 ring-1 ring-inset ring-indigo-600/20 dark:bg-indigo-400/10 dark:text-indigo-200 dark:ring-indigo-400/30",
 } as const;
 
-export const STATUS_BADGE_CLASSES: Record<TicketStatus, string> = {
+export const statusBadgeClasses: Record<TicketStatus, string> = {
   OPEN: tone.blue,
   IN_PROGRESS: tone.violet,
   RESOLVED: tone.green,
   CLOSED: tone.neutral,
 };
 
-export const PRIORITY_BADGE_CLASSES: Record<TicketPriority | "UNCLASSIFIED", string> = {
+export const priorityBadgeClasses: Record<TicketPriority | "UNCLASSIFIED", string> = {
   CRITICAL: `${tone.red} font-semibold`,
   HIGH: tone.orange,
   MEDIUM: tone.amber,
@@ -71,13 +71,13 @@ export const PRIORITY_BADGE_CLASSES: Record<TicketPriority | "UNCLASSIFIED", str
 };
 
 /** Row emphasis for urgent unresolved tickets in the queue. */
-export const PRIORITY_ROW_CLASSES: Partial<Record<TicketPriority, string>> = {
+export const priorityRowClasses: Partial<Record<TicketPriority, string>> = {
   CRITICAL:
     "bg-red-50/60 hover:bg-red-50 border-l-4 border-l-red-500 dark:bg-red-500/8 dark:hover:bg-red-500/12 dark:border-l-red-400",
   HIGH: "bg-orange-50/40 hover:bg-orange-50/80 border-l-4 border-l-orange-400 dark:bg-orange-400/5 dark:hover:bg-orange-400/10 dark:border-l-orange-400/80",
 };
 
-export const CATEGORY_BADGE_CLASSES: Record<TicketCategory, string> = {
+export const categoryBadgeClasses: Record<TicketCategory, string> = {
   ROYALTY_PAYMENTS: tone.green,
   ISBN_METADATA: tone.sky,
   PRINTING_QUALITY: tone.rose,
@@ -86,26 +86,26 @@ export const CATEGORY_BADGE_CLASSES: Record<TicketCategory, string> = {
   GENERAL_INQUIRY: tone.neutral,
 };
 
-export const SOURCE_LABELS: Record<ClassificationSource, string> = {
+export const sourceLabels: Record<ClassificationSource, string> = {
   AI: "AI",
   RULE: "Rule",
   ADMIN: "Edited",
 };
 
-export const SOURCE_DESCRIPTIONS: Record<ClassificationSource, string> = {
+export const sourceDescriptions: Record<ClassificationSource, string> = {
   AI: "Set by AI classification",
   RULE: "Set by keyword rules (AI fallback)",
   ADMIN: "Edited by an admin",
 };
 
-export const SOURCE_BADGE_CLASSES: Record<ClassificationSource, string> = {
+export const sourceBadgeClasses: Record<ClassificationSource, string> = {
   AI: tone.violet,
   RULE: tone.slate,
   ADMIN: tone.teal,
 };
 
 /** Solid colours for dots / bars (badges above are tinted backgrounds). */
-export const PRIORITY_DOT_CLASSES: Record<TicketPriority | "UNCLASSIFIED", string> = {
+export const priorityDotClasses: Record<TicketPriority | "UNCLASSIFIED", string> = {
   CRITICAL: "bg-red-600 dark:bg-red-400",
   HIGH: "bg-orange-500 dark:bg-orange-400",
   MEDIUM: "bg-amber-400 dark:bg-amber-300",
@@ -113,7 +113,7 @@ export const PRIORITY_DOT_CLASSES: Record<TicketPriority | "UNCLASSIFIED", strin
   UNCLASSIFIED: "bg-slate-300 dark:bg-slate-600",
 };
 
-export const STATUS_DOT_CLASSES: Record<TicketStatus, string> = {
+export const statusDotClasses: Record<TicketStatus, string> = {
   OPEN: "bg-blue-500 dark:bg-blue-400",
   IN_PROGRESS: "bg-violet-500 dark:bg-violet-400",
   RESOLVED: "bg-emerald-500 dark:bg-emerald-400",

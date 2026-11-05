@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { TICKET_CATEGORIES, TICKET_PRIORITIES } from "@/shared/constants/ticket";
-import { CATEGORY_DEFINITIONS } from "../knowledge-base/policies";
+import { ticketCategories, ticketPriorities } from "@/shared/constants/ticket";
+import { categoryDefinitions } from "../knowledge-base/policies";
 import type { PublisherNames } from "../knowledge-base/publisher";
 import { neutraliseTags, truncate, wrapAuthorText } from "./sanitize";
 
 /** Bump when the prompt changes so accuracy can be compared per version. */
-export const CLASSIFY_PROMPT_VERSION = "classify-v1";
-export const CLASSIFY_MAX_DESCRIPTION_CHARS = 1500;
-export const CLASSIFY_MAX_OUTPUT_TOKENS = 200;
+export const classifyPromptVersion = "classify-v1";
+export const classifyMaxDescriptionChars = 1500;
+export const classifyMaxOutputTokens = 200;
 
 /* ------------------------------------------------------------------ */
 /* Output contract                                                    */
@@ -15,8 +15,8 @@ export const CLASSIFY_MAX_OUTPUT_TOKENS = 200;
 const upper = (v: unknown) => (typeof v === "string" ? v.trim().toUpperCase().replace(/[\s-]+/g, "_") : v);
 
 export const classificationSchema = z.object({
-  category: z.preprocess(upper, z.enum(TICKET_CATEGORIES)),
-  priority: z.preprocess(upper, z.enum(TICKET_PRIORITIES)),
+  category: z.preprocess(upper, z.enum(ticketCategories)),
+  priority: z.preprocess(upper, z.enum(ticketPriorities)),
   confidence: z.coerce.number().min(0).max(1),
   // Models occasionally overrun the limit; trimming is cheaper than a retry and loses nothing important.
   reasoning: z.string().min(1).transform((s) => s.trim().slice(0, 300)),
@@ -24,11 +24,11 @@ export const classificationSchema = z.object({
 export type ClassificationOutput = z.infer<typeof classificationSchema>;
 
 /** JSON Schema enforced natively by Gemini (responseJsonSchema). */
-export const CLASSIFY_JSON_SCHEMA: Record<string, unknown> = {
+export const classifyJsonSchema: Record<string, unknown> = {
   type: "object",
   properties: {
-    category: { type: "string", enum: [...TICKET_CATEGORIES] },
-    priority: { type: "string", enum: [...TICKET_PRIORITIES] },
+    category: { type: "string", enum: [...ticketCategories] },
+    priority: { type: "string", enum: [...ticketPriorities] },
     confidence: { type: "number", minimum: 0, maximum: 1 },
     reasoning: { type: "string", maxLength: 300 },
   },
@@ -61,7 +61,7 @@ export function parseClassification(text: string): ClassificationOutput {
  * royalty "late" vs "how is it calculated", description edits (GENERAL, not ISBN),
  * short vs extended unavailability, and when money/legal pushes to CRITICAL.
  */
-const FEW_SHOTS: { ticket: string; out: ClassificationOutput }[] = [
+const fewShots: { ticket: string; out: ClassificationOutput }[] = [
   {
     ticket: "Subject: No royalty yet | My book was published 4 months ago and I haven't received any royalty. | Context: pending ₹1,575; never paid; due in next payout run.",
     out: { category: "ROYALTY_PAYMENTS", priority: "MEDIUM", confidence: 0.9, reasoning: "First payout question; not yet overdue per context, so a schedule explanation." },
@@ -97,10 +97,10 @@ const FEW_SHOTS: { ticket: string; out: ClassificationOutput }[] = [
 ];
 
 export function buildClassifySystemPrompt(p: PublisherNames): string {
-  const cats = Object.entries(CATEGORY_DEFINITIONS)
+  const cats = Object.entries(categoryDefinitions)
     .map(([k, v]) => `- ${k}: ${v}`)
     .join("\n");
-  const shots = FEW_SHOTS.map((s) => `Ticket: ${s.ticket}\nJSON: ${JSON.stringify(s.out)}`).join("\n\n");
+  const shots = fewShots.map((s) => `Ticket: ${s.ticket}\nJSON: ${JSON.stringify(s.out)}`).join("\n\n");
   return `You are the ticket triage system for ${p.name}, a self-publishing company. Classify each author support ticket into exactly one category and one priority.
 
 Categories:
@@ -133,12 +133,12 @@ export interface ClassifyTicketInput {
 export function buildClassifyUserPrompt(t: ClassifyTicketInput): string {
   return `<ticket>
 Subject: ${wrapAuthorText(t.subject, 200)}
-Description: ${wrapAuthorText(t.description, CLASSIFY_MAX_DESCRIPTION_CHARS)}
+Description: ${wrapAuthorText(t.description, classifyMaxDescriptionChars)}
 Context: ${neutraliseTags(truncate(t.context, 400))}
 </ticket>
 Return the JSON object for this ticket.`;
 }
 
 /** Appended on the single retry after an invalid response. */
-export const CLASSIFY_RETRY_SUFFIX =
+export const classifyRetrySuffix =
   "\n\nYour previous answer was not valid. Respond with ONLY the JSON object with keys category, priority, confidence, reasoning, using the exact enum values listed.";

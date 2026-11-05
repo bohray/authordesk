@@ -59,8 +59,8 @@ async function login(email: string, password: string) {
   return res.headers.get("set-cookie")!.split(";")[0];
 }
 
-const PRIYA = "priya.sharma@email.com";
-const KAVITA = "kavita.deshmukh@email.com";
+const priyaEmail = "priya.sharma@email.com";
+const kavitaEmail = "kavita.deshmukh@email.com";
 const flush = () => new Promise((r) => setTimeout(r, 10));
 
 describe("auth + author API", () => {
@@ -69,8 +69,8 @@ describe("auth + author API", () => {
 
   beforeAll(async () => {
     await startTestDb();
-    priya = await login(PRIYA, "Author@123");
-    kavita = await login(KAVITA, "Author@123");
+    priya = await login(priyaEmail, "Author@123");
+    kavita = await login(kavitaEmail, "Author@123");
   });
   afterAll(stopTestDb);
   beforeEach(() => ai.classifyTicket.mockClear());
@@ -136,7 +136,7 @@ describe("auth + author API", () => {
 
     it("returns the current user from /auth/me and 401 without a cookie", async () => {
       const me = await call(meGET as Handler, { url: "/api/v1/auth/me", cookie: priya });
-      expect(me.json.data).toMatchObject({ email: PRIYA, role: "AUTHOR", authorCode: "AUTH001" });
+      expect(me.json.data).toMatchObject({ email: priyaEmail, role: "AUTHOR", authorCode: "AUTH001" });
       const anon = await call(meGET as Handler, { url: "/api/v1/auth/me" });
       expect(anon.status).toBe(401);
       expect(anon.json.error.code).toBe("UNAUTHENTICATED");
@@ -308,7 +308,7 @@ describe("auth + author API", () => {
       expect(res.json.meta).toMatchObject({ page: 1, limit: 2, total: 3, totalPages: 2 });
       const dates = res.json.data.map((t: { createdAt: string }) => Date.parse(t.createdAt));
       expect(dates[0]).toBeGreaterThanOrEqual(dates[1]);
-      const priyaId = (await User.findOne({ email: PRIYA }).lean())!._id;
+      const priyaId = (await User.findOne({ email: priyaEmail }).lean())!._id;
       const owned = await Ticket.countDocuments({ authorId: priyaId });
       expect(owned).toBe(3);
     });
@@ -352,7 +352,7 @@ describe("auth + author API", () => {
         cookie: kavita,
       });
       expect(res.status).toBe(200);
-      const kavitaId = (await User.findOne({ email: KAVITA }).lean())!._id;
+      const kavitaId = (await User.findOne({ email: kavitaEmail }).lean())!._id;
       const own = await Ticket.find({ authorId: kavitaId }, { _id: 1 }).lean();
       expect(res.json.data.changed.map((c: { id: string }) => c.id).sort()).toEqual(
         own.map((t) => t._id.toString()).sort(),

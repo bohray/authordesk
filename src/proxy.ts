@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifySession } from "@/server/auth/jwt";
-import { SESSION_COOKIE } from "@/shared/constants/roles";
+import { sessionCookie } from "@/shared/constants/roles";
 
 /**
  * Page-level guard (Next 16 "proxy", formerly middleware). It only verifies the JWT,
@@ -9,7 +9,7 @@ import { SESSION_COOKIE } from "@/shared/constants/roles";
  */
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  const token = req.cookies.get(sessionCookie)?.value;
   const secret = process.env.JWT_SECRET ?? "";
   const session = token && secret ? await verifySession(token, secret) : null;
 

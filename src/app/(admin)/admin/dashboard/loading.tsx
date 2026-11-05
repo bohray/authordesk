@@ -1,5 +1,5 @@
-import { DashboardPageHeader } from "@/features/admin-dashboard/components/dashboard-page-header";
-import { DashboardSkeleton } from "@/features/admin-dashboard/components/dashboard-skeleton";
+import { DashboardPageHeader } from "@/features/admin-dashboard/components/DashboardPageHeader";
+import { DashboardSkeleton } from "@/features/admin-dashboard/components/DashboardSkeleton";
 
 export default function Loading() {
   return (

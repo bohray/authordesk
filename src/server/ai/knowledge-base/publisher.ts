@@ -21,4 +21,4 @@ export function allPlatforms(p: PublisherNames): string[] {
   return ["Amazon India", "Flipkart", "Amazon US", "Amazon UK", p.store];
 }
 
-export const PAYOUT_THRESHOLD_INR = 1000;
+export const payoutThresholdInr = 1000;

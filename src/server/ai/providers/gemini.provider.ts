@@ -9,7 +9,7 @@ import {
   type LLMRequest,
   type LLMResponse,
   type ModelTier,
-} from "./llm-provider";
+} from "./llmProvider";
 
 /** Gemini errors embed `"retryDelay": "23s"` in the message body for 429s. */
 function parseRetryDelay(message: string): number | null {
@@ -62,7 +62,7 @@ export class GeminiProvider implements LLMProvider {
             ? { responseMimeType: "application/json", responseJsonSchema: req.jsonSchema }
             : {}),
           abortSignal: req.signal,
-          // The SDK only retries when retryOptions is set; leave it unset so the llm-client
+          // The SDK only retries when retryOptions is set; leave it unset so the llmClient
           // owns retry/backoff/fallback in one place (no hidden multiplicative retries).
           httpOptions: { timeout: env().AI_TIMEOUT_MS },
         },

@@ -1,4 +1,4 @@
-import { withApi } from "@/server/http/with-api";
+import { withApi } from "@/server/http/withApi";
 import { ok } from "@/server/http/responses";
 import { getAdminStats } from "@/server/services/stats.service";
 

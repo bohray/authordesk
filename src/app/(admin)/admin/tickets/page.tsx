@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { TicketQueue } from "@/features/admin-queue/components/ticket-queue";
-import { QueuePageSkeleton } from "@/features/admin-queue/components/queue-skeletons";
+import { TicketQueue } from "@/features/admin-queue/components/TicketQueue";
+import { QueuePageSkeleton } from "@/features/admin-queue/components/QueueSkeletons";
 
 export const metadata: Metadata = { title: "Ticket Queue" };
 

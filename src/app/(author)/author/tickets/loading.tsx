@@ -1,5 +1,5 @@
-import { TicketsPageHeader } from "@/features/tickets/components/tickets-page-header";
-import { TicketListSkeleton } from "@/features/tickets/components/ticket-skeletons";
+import { TicketsPageHeader } from "@/features/tickets/components/TicketsPageHeader";
+import { TicketListSkeleton } from "@/features/tickets/components/TicketSkeletons";
 
 export default function Loading() {
   return (

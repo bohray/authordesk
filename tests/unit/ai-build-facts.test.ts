@@ -9,11 +9,11 @@ import {
   renderFactsBlock,
   type FactsBook,
   type FactsInput,
-} from "@/server/ai/context/build-facts";
+} from "@/server/ai/context/buildFacts";
 import { publisherNames } from "@/server/ai/knowledge-base/publisher";
 
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
-const NOW = new Date("2026-11-05T10:00:00Z");
+const fixedNow = new Date("2026-11-05T10:00:00Z");
 const publisher = publisherNames("Inkwell Publishing");
 
 const book = (over: Partial<FactsBook> = {}): FactsBook => ({
@@ -32,7 +32,7 @@ const book = (over: Partial<FactsBook> = {}): FactsBook => ({
 });
 
 const input = (b: FactsBook | null): FactsInput => ({
-  now: NOW,
+  now: fixedNow,
   publisher,
   ticket: { ticketNumber: "T-1001", status: "OPEN", createdAt: new Date("2026-11-01T08:00:00Z"), replyCount: 0 },
   book: b,
@@ -54,12 +54,12 @@ describe("payout schedule", () => {
 
 describe("royalty assessment", () => {
   it("below ₹1,000 threshold, never paid → rolls over, NOT overdue", () => {
-    const r = assessRoyalty(book({ royalty: { earned: 850, paid: 0, pending: 850, lastPayoutDate: null } }), NOW);
+    const r = assessRoyalty(book({ royalty: { earned: 850, paid: 0, pending: 850, lastPayoutDate: null } }), fixedNow);
     expect(r).toMatchObject({ status: "BELOW_THRESHOLD", neverPaid: true, aboveThreshold: false, longOverdue: false });
   });
 
   it("above threshold, never paid for over a year → OVERDUE, long overdue", () => {
-    const r = assessRoyalty(book(), NOW);
+    const r = assessRoyalty(book(), fixedNow);
     expect(r.status).toBe("OVERDUE");
     expect(r.neverPaid).toBe(true);
     expect(r.missedPayoutRuns).toBeGreaterThanOrEqual(4);
@@ -68,18 +68,18 @@ describe("royalty assessment", () => {
 
   it("does not count the payout run for the quarter BEFORE publication as missed", () => {
     // Published 2026-07-10: first eligible run is 14 Nov 2026 (Jul–Sep), which is still ahead.
-    const r = assessRoyalty(book({ publicationDate: d("2026-07-10") }), NOW);
+    const r = assessRoyalty(book({ publicationDate: d("2026-07-10") }), fixedNow);
     expect(r.status).toBe("DUE_NEXT_RUN");
   });
 
   it("recent payout → due next run; nothing pending → NONE_PENDING", () => {
     const recent = assessRoyalty(
       book({ royalty: { earned: 5000, paid: 3000, pending: 2000, lastPayoutDate: d("2026-08-14") } }),
-      NOW,
+      fixedNow,
     );
     expect(recent.status).toBe("DUE_NEXT_RUN");
     expect(recent.daysSinceLastPayout).toBe(83);
-    const none = assessRoyalty(book({ royalty: { earned: 10, paid: 10, pending: 0, lastPayoutDate: d("2026-08-14") } }), NOW);
+    const none = assessRoyalty(book({ royalty: { earned: 10, paid: 10, pending: 0, lastPayoutDate: d("2026-08-14") } }), fixedNow);
     expect(none.status).toBe("NONE_PENDING");
   });
 

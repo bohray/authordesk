@@ -1,6 +1,6 @@
 import "server-only";
 import { Schema, model, models, type InferSchemaType, type Model } from "mongoose";
-import { ROLES } from "@/shared/constants/roles";
+import { userRoles } from "@/shared/constants/roles";
 
 /** Author profile is embedded: strictly 1:1 with the user and always read together. */
 const authorProfileSchema = new Schema(
@@ -18,7 +18,7 @@ const userSchema = new Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
     name: { type: String, required: true, trim: true },
-    role: { type: String, enum: ROLES, required: true, index: true },
+    role: { type: String, enum: userRoles, required: true, index: true },
     authorProfile: { type: authorProfileSchema, default: undefined },
   },
   { timestamps: true },

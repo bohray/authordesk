@@ -1,6 +1,6 @@
 import "server-only";
 import { Schema, model, models, type InferSchemaType, type Model, type Types } from "mongoose";
-import { TICKET_EVENT_TYPES } from "@/shared/constants/ticket";
+import { ticketEventTypes } from "@/shared/constants/ticket";
 
 /* ------------------------------------------------------------------ */
 /* Internal notes: admin-only, separate collection by design.          */
@@ -48,7 +48,7 @@ const ticketEventSchema = new Schema(
     ticketId: { type: Schema.Types.ObjectId, ref: "Ticket", required: true, index: true },
     actorId: { type: Schema.Types.ObjectId, ref: "User", default: null }, // null = system/AI
     actorName: { type: String, default: "System" },
-    type: { type: String, enum: TICKET_EVENT_TYPES, required: true },
+    type: { type: String, enum: ticketEventTypes, required: true },
     from: { type: String, default: null },
     to: { type: String, default: null },
   },

@@ -4,7 +4,7 @@ import Script from "next/script";
 export const metadata: Metadata = { title: "API docs" };
 
 /** Pinned so a CDN release can never change what this page runs. */
-const SWAGGER_UI = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14";
+const swaggerUi = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14";
 
 // Loads the stylesheet and bundle in order, then mounts Swagger UI. Done in one inline
 // script so the page stays a Server Component and the bundle is fetched only here.
@@ -12,10 +12,10 @@ const init = `
 (function () {
   var css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "${SWAGGER_UI}/swagger-ui.css";
+  css.href = "${swaggerUi}/swagger-ui.css";
   document.head.appendChild(css);
   var js = document.createElement("script");
-  js.src = "${SWAGGER_UI}/swagger-ui-bundle.js";
+  js.src = "${swaggerUi}/swagger-ui-bundle.js";
   js.crossOrigin = "anonymous";
   js.onload = function () {
     window.SwaggerUIBundle({

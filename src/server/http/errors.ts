@@ -1,7 +1,7 @@
 import "server-only";
 import type { ErrorCode } from "@/shared/types/dto";
 
-const STATUS: Record<ErrorCode, number> = {
+const httpStatusByCode: Record<ErrorCode, number> = {
   BAD_REQUEST: 400,
   VALIDATION_ERROR: 422,
   UNAUTHENTICATED: 401,
@@ -23,7 +23,7 @@ export class AppError extends Error {
   ) {
     super(message);
     this.name = "AppError";
-    this.status = STATUS[code];
+    this.status = httpStatusByCode[code];
   }
 }
 

@@ -1,12 +1,12 @@
 import "server-only";
 import { Schema, model, models, type InferSchemaType, type Model, type Types } from "mongoose";
-import { ROLES } from "@/shared/constants/roles";
+import { userRoles } from "@/shared/constants/roles";
 import {
-  AI_STATUSES,
-  CLASSIFICATION_SOURCES,
-  TICKET_CATEGORIES,
-  TICKET_PRIORITIES,
-  TICKET_STATUSES,
+  aiStatuses,
+  classificationSources,
+  ticketCategories,
+  ticketPriorities,
+  ticketStatuses,
 } from "@/shared/constants/ticket";
 
 /**
@@ -17,7 +17,7 @@ import {
 const messageSchema = new Schema(
   {
     senderId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    senderRole: { type: String, enum: ROLES, required: true },
+    senderRole: { type: String, enum: userRoles, required: true },
     senderName: { type: String, required: true },
     body: { type: String, required: true },
     aiAssisted: { type: Boolean, default: false },
@@ -41,17 +41,17 @@ const ticketSchema = new Schema(
       type: new Schema({ name: String, size: Number, type: String }, { _id: false }),
       default: null,
     },
-    status: { type: String, enum: TICKET_STATUSES, default: "OPEN" },
+    status: { type: String, enum: ticketStatuses, default: "OPEN" },
 
-    category: { type: String, enum: [...TICKET_CATEGORIES, null], default: null },
-    categorySource: { type: String, enum: [...CLASSIFICATION_SOURCES, null], default: null },
-    priority: { type: String, enum: [...TICKET_PRIORITIES, null], default: null },
-    prioritySource: { type: String, enum: [...CLASSIFICATION_SOURCES, null], default: null },
+    category: { type: String, enum: [...ticketCategories, null], default: null },
+    categorySource: { type: String, enum: [...classificationSources, null], default: null },
+    priority: { type: String, enum: [...ticketPriorities, null], default: null },
+    prioritySource: { type: String, enum: [...classificationSources, null], default: null },
     /** CRITICAL=3 … LOW=0, -1 = not yet classified. Lets the queue sort by urgency via index. */
     priorityRank: { type: Number, default: -1 },
 
     ai: {
-      status: { type: String, enum: AI_STATUSES, default: "PENDING" },
+      status: { type: String, enum: aiStatuses, default: "PENDING" },
       confidence: { type: Number, default: null },
       reasoning: { type: String, default: null },
       model: { type: String, default: null },

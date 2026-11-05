@@ -3,10 +3,10 @@
  * Keep values stable: they are persisted in MongoDB.
  */
 
-export const TICKET_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
-export type TicketStatus = (typeof TICKET_STATUSES)[number];
+export const ticketStatuses = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
+export type TicketStatus = (typeof ticketStatuses)[number];
 
-export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
+export const ticketStatusLabels: Record<TicketStatus, string> = {
   OPEN: "Open",
   IN_PROGRESS: "In Progress",
   RESOLVED: "Resolved",
@@ -14,9 +14,9 @@ export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
 };
 
 /** Statuses that still need ops attention (used for queue defaults + age badges). */
-export const UNRESOLVED_STATUSES: readonly TicketStatus[] = ["OPEN", "IN_PROGRESS"];
+export const unresolvedStatuses: readonly TicketStatus[] = ["OPEN", "IN_PROGRESS"];
 
-export const TICKET_CATEGORIES = [
+export const ticketCategories = [
   "ROYALTY_PAYMENTS",
   "ISBN_METADATA",
   "PRINTING_QUALITY",
@@ -24,9 +24,9 @@ export const TICKET_CATEGORIES = [
   "BOOK_STATUS_PRODUCTION",
   "GENERAL_INQUIRY",
 ] as const;
-export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
+export type TicketCategory = (typeof ticketCategories)[number];
 
-export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
+export const ticketCategoryLabels: Record<TicketCategory, string> = {
   ROYALTY_PAYMENTS: "Royalty & Payments",
   ISBN_METADATA: "ISBN & Metadata Issues",
   PRINTING_QUALITY: "Printing & Quality",
@@ -35,10 +35,10 @@ export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
   GENERAL_INQUIRY: "General Inquiry",
 };
 
-export const TICKET_PRIORITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
-export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
+export const ticketPriorities = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
+export type TicketPriority = (typeof ticketPriorities)[number];
 
-export const TICKET_PRIORITY_LABELS: Record<TicketPriority, string> = {
+export const ticketPriorityLabels: Record<TicketPriority, string> = {
   CRITICAL: "Critical",
   HIGH: "High",
   MEDIUM: "Medium",
@@ -46,7 +46,7 @@ export const TICKET_PRIORITY_LABELS: Record<TicketPriority, string> = {
 };
 
 /** Numeric rank stored on the ticket so the queue can sort by urgency in one index. */
-export const PRIORITY_RANK: Record<TicketPriority, number> = {
+export const priorityRankByLevel: Record<TicketPriority, number> = {
   CRITICAL: 3,
   HIGH: 2,
   MEDIUM: 1,
@@ -54,13 +54,13 @@ export const PRIORITY_RANK: Record<TicketPriority, number> = {
 };
 
 /** Where a category/priority value came from. ADMIN = human override. */
-export const CLASSIFICATION_SOURCES = ["AI", "RULE", "ADMIN"] as const;
-export type ClassificationSource = (typeof CLASSIFICATION_SOURCES)[number];
+export const classificationSources = ["AI", "RULE", "ADMIN"] as const;
+export type ClassificationSource = (typeof classificationSources)[number];
 
-export const AI_STATUSES = ["PENDING", "DONE", "FAILED"] as const;
-export type AiStatus = (typeof AI_STATUSES)[number];
+export const aiStatuses = ["PENDING", "DONE", "FAILED"] as const;
+export type AiStatus = (typeof aiStatuses)[number];
 
-export const TICKET_EVENT_TYPES = [
+export const ticketEventTypes = [
   "CREATED",
   "STATUS_CHANGED",
   "CATEGORY_CHANGED",
@@ -70,16 +70,16 @@ export const TICKET_EVENT_TYPES = [
   "REPLIED",
   "NOTE_ADDED",
 ] as const;
-export type TicketEventType = (typeof TICKET_EVENT_TYPES)[number];
+export type TicketEventType = (typeof ticketEventTypes)[number];
 
 /** Admin queue sort orders. urgency = unresolved first, priority desc, then oldest first. */
-export const QUEUE_SORTS = ["urgency", "newest", "oldest"] as const;
-export type QueueSort = (typeof QUEUE_SORTS)[number];
-export const DEFAULT_QUEUE_SORT: QueueSort = "urgency";
+export const queueSorts = ["urgency", "newest", "oldest"] as const;
+export type QueueSort = (typeof queueSorts)[number];
+export const defaultQueueSort: QueueSort = "urgency";
 
 /** Admin queue assignee filter values (besides "anyone", which is the absence of a filter). */
-export const QUEUE_ASSIGNEE_FILTERS = ["me", "unassigned"] as const;
-export type QueueAssignee = (typeof QUEUE_ASSIGNEE_FILTERS)[number];
+export const queueAssigneeFilters = ["me", "unassigned"] as const;
+export type QueueAssignee = (typeof queueAssigneeFilters)[number];
 
 /** Value used by the "which book" dropdown for account-level queries. */
-export const GENERAL_BOOK_OPTION = "GENERAL";
+export const generalBookOption = "GENERAL";

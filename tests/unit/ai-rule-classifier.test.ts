@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { PRIORITY_RANK } from "@/shared/constants/ticket";
-import { ruleClassify } from "@/server/ai/rule-classifier";
-import type { RoyaltyFacts } from "@/server/ai/context/build-facts";
+import { priorityRankByLevel } from "@/shared/constants/ticket";
+import { ruleClassify } from "@/server/ai/ruleClassifier";
+import type { RoyaltyFacts } from "@/server/ai/context/buildFacts";
 
 const c = (subject: string, description = "") => ruleClassify({ subject, description });
 
@@ -34,7 +34,7 @@ describe("rule classifier: KB sample queries", () => {
     const royalty = c("Royalty", "It has been 6 months and I haven't received any royalty.");
     const bio = c("Bio", "Can I update my bio on the dashboard?");
     expect(royalty.category).toBe("ROYALTY_PAYMENTS");
-    expect(PRIORITY_RANK[royalty.priority]).toBeGreaterThan(PRIORITY_RANK[bio.priority]);
+    expect(priorityRankByLevel[royalty.priority]).toBeGreaterThan(priorityRankByLevel[bio.priority]);
     expect(royalty.priority).toBe("CRITICAL");
   });
 

@@ -4,7 +4,7 @@ import type { BookRecord } from "../repositories/types";
 import { iso } from "./common";
 
 /** The dataset's status string for a book that is on sale. */
-export const PUBLISHED_STATUS = "Published & Live";
+export const publishedStatus = "Published & Live";
 
 export function toBookDTO(b: BookRecord): BookDTO {
   return {
@@ -15,7 +15,7 @@ export function toBookDTO(b: BookRecord): BookDTO {
     genre: b.genre,
     publicationDate: iso(b.publicationDate),
     status: b.status,
-    isPublished: b.status === PUBLISHED_STATUS,
+    isPublished: b.status === publishedStatus,
     mrp: b.mrp ?? null,
     royaltyPerCopy: b.royaltyPerCopy ?? null,
     copiesSold: b.copiesSold ?? 0,

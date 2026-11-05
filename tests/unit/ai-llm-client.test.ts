@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { callLLM, getCircuitState, hasConfiguredProvider, setLLMClientOverrides } from "@/server/ai/llm-client";
-import { LLMError, type LLMProvider, type LLMRequest, type LLMResponse } from "@/server/ai/providers/llm-provider";
-import { setUsageSinkForTesting, type UsageEntry } from "@/server/ai/usage-logger";
+import { callLLM, getCircuitState, hasConfiguredProvider, setLLMClientOverrides } from "@/server/ai/llmClient";
+import { LLMError, type LLMProvider, type LLMRequest, type LLMResponse } from "@/server/ai/providers/llmProvider";
+import { setUsageSinkForTesting, type UsageEntry } from "@/server/ai/usageLogger";
 
 type Behaviour = (req: LLMRequest) => Promise<LLMResponse>;
 
@@ -63,7 +63,7 @@ afterEach(() => {
   setUsageSinkForTesting(null);
 });
 
-describe("llm-client", () => {
+describe("llmClient", () => {
   it("returns the primary provider's parsed result and logs one successful attempt", async () => {
     const a = fake("a", ok());
     setup([a, fake("b", ok())]);

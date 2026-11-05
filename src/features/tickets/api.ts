@@ -1,17 +1,17 @@
-import { apiClient } from "@/lib/api-client";
-import { API_ROUTES } from "@/constants/routes";
+import { apiClient } from "@/lib/apiClient";
+import { apiRoutes } from "@/constants/routes";
 import type { CreateTicketInput } from "@/shared/schemas/ticket.schema";
 import type { AuthorTicketDTO, MyBooksDTO } from "@/shared/types/dto";
 
 export const authorTicketsApi = {
   list: (page: number, limit: number, signal?: AbortSignal) =>
-    apiClient.getPaginated<AuthorTicketDTO>(API_ROUTES.me.tickets, { page, limit }, signal),
+    apiClient.getPaginated<AuthorTicketDTO>(apiRoutes.me.tickets, { page, limit }, signal),
   get: (ticketId: string, signal?: AbortSignal) =>
-    apiClient.get<AuthorTicketDTO>(API_ROUTES.me.ticket(ticketId), undefined, signal),
+    apiClient.get<AuthorTicketDTO>(apiRoutes.me.ticket(ticketId), undefined, signal),
   create: (input: CreateTicketInput) =>
-    apiClient.post<AuthorTicketDTO>(API_ROUTES.me.tickets, input),
+    apiClient.post<AuthorTicketDTO>(apiRoutes.me.tickets, input),
   reply: (ticketId: string, body: string) =>
-    apiClient.post<AuthorTicketDTO>(API_ROUTES.me.ticketMessages(ticketId), { body }),
+    apiClient.post<AuthorTicketDTO>(apiRoutes.me.ticketMessages(ticketId), { body }),
   /** Book list for the "which book" dropdown (shares the books cache key). */
-  books: (signal?: AbortSignal) => apiClient.get<MyBooksDTO>(API_ROUTES.me.books, undefined, signal),
+  books: (signal?: AbortSignal) => apiClient.get<MyBooksDTO>(apiRoutes.me.books, undefined, signal),
 };

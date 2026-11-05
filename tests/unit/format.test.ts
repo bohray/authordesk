@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bookLabel, formatBytes, GENERAL_BOOK_LABEL, plural } from "@/lib/format";
-import { ApiError, isNotFoundError } from "@/lib/api-client";
+import { bookLabel, formatBytes, generalBookLabel, plural } from "@/lib/format";
+import { ApiError, isNotFoundError } from "@/lib/apiClient";
 
 describe("format helpers", () => {
   it("formats bytes without a trailing .0", () => {
@@ -17,7 +17,7 @@ describe("format helpers", () => {
   });
 
   it("labels account-level tickets consistently", () => {
-    expect(bookLabel(null)).toBe(GENERAL_BOOK_LABEL);
+    expect(bookLabel(null)).toBe(generalBookLabel);
     expect(bookLabel({ title: "The Last River" })).toBe("The Last River");
   });
 });

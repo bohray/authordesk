@@ -5,22 +5,22 @@ import { AiDraft } from "@/server/db/models";
 import { logger } from "@/server/lib/logger";
 import type { TicketCategory } from "@/shared/constants/ticket";
 import type { DraftDTO } from "@/shared/types/dto";
-import { computeFacts, renderFactsBlock } from "./context/build-facts";
-import { loadTicketContext } from "./context/load-context";
-import { hasConfiguredProvider, callLLM } from "./llm-client";
+import { computeFacts, renderFactsBlock } from "./context/buildFacts";
+import { loadTicketContext } from "./context/loadContext";
+import { hasConfiguredProvider, callLLM } from "./llmClient";
 import {
-  DRAFT_MAX_OUTPUT_TOKENS,
-  DRAFT_PROMPT_VERSION,
-  DRAFT_TEMPERATURE,
+  draftMaxOutputTokens,
+  draftPromptVersion,
+  draftTemperature,
   buildDraftSystemPrompt,
   buildDraftUserPrompt,
   cleanDraft,
 } from "./prompts/draft.prompt";
-import { isLLMError } from "./providers/llm-provider";
-import { ruleClassify } from "./rule-classifier";
+import { isLLMError } from "./providers/llmProvider";
+import { ruleClassify } from "./ruleClassifier";
 
-const MSG_UNAVAILABLE = "AI drafting is temporarily unavailable. Please write a reply manually.";
-const MSG_NOT_CONFIGURED = "AI is not configured on this server. Please write a reply manually.";
+const msgUnavailable = "AI drafting is temporarily unavailable. Please write a reply manually.";
+const msgNotConfigured = "AI is not configured on this server. Please write a reply manually.";
 
 const unavailable = (message: string): DraftDTO => ({
   content: null,
@@ -67,7 +67,7 @@ async function generate(ticketId: string, regenerate: boolean): Promise<DraftDTO
       };
     }
 
-    if (!hasConfiguredProvider()) return unavailable(MSG_NOT_CONFIGURED);
+    if (!hasConfiguredProvider()) return unavailable(msgNotConfigured);
 
     // If classification hasn't landed yet, pick KB sections via the free rule engine.
     const category: TicketCategory =
@@ -92,8 +92,8 @@ async function generate(ticketId: string, regenerate: boolean): Promise<DraftDTO
       system,
       user,
       responseFormat: "text",
-      maxOutputTokens: DRAFT_MAX_OUTPUT_TOKENS,
-      temperature: DRAFT_TEMPERATURE, // a little variety reads human; facts are pinned by the prompt
+      maxOutputTokens: draftMaxOutputTokens,
+      temperature: draftTemperature, // a little variety reads human; facts are pinned by the prompt
       parse: cleanDraft,
     });
 
@@ -104,7 +104,7 @@ async function generate(ticketId: string, regenerate: boolean): Promise<DraftDTO
           content: res.value,
           model: res.model,
           provider: res.provider,
-          promptVersion: DRAFT_PROMPT_VERSION,
+          promptVersion: draftPromptVersion,
           inputTokens: res.inputTokens,
           outputTokens: res.outputTokens,
           basedOnMessageCount: messages.length,
@@ -132,9 +132,9 @@ async function generate(ticketId: string, regenerate: boolean): Promise<DraftDTO
   } catch (err) {
     if (isLLMError(err)) {
       logger.warn("ai.draft_unavailable", { ticketId, kind: err.kind });
-      return unavailable(err.kind === "NOT_CONFIGURED" ? MSG_NOT_CONFIGURED : MSG_UNAVAILABLE);
+      return unavailable(err.kind === "NOT_CONFIGURED" ? msgNotConfigured : msgUnavailable);
     }
     logger.error("ai.draft_crashed", { ticketId, error: String(err) });
-    return unavailable(MSG_UNAVAILABLE);
+    return unavailable(msgUnavailable);
   }
 }

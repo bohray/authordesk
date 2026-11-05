@@ -1,10 +1,10 @@
 import type { TicketCategory } from "@/shared/constants/ticket";
-import { RESPONSE_GUIDANCE, type ResponseGuidance } from "./examples";
-import { CATEGORY_DEFINITIONS, CATEGORY_KB_SECTIONS, kbSections } from "./policies";
+import { responseGuidance, type ResponseGuidance } from "./examples";
+import { categoryDefinitions, categoryKbSections, kbSections } from "./policies";
 import type { PublisherNames } from "./publisher";
 import { toneGuidelines } from "./tone";
 
-export { CATEGORY_DEFINITIONS, CATEGORY_KB_SECTIONS, kbSections, toneGuidelines, RESPONSE_GUIDANCE };
+export { categoryDefinitions, categoryKbSections, kbSections, toneGuidelines, responseGuidance };
 export type { ResponseGuidance };
 
 export interface CategoryKnowledge {
@@ -22,7 +22,7 @@ export function knowledgeForCategory(category: TicketCategory, p: PublisherNames
   const all = kbSections(p);
   return {
     overview: all.OVERVIEW_BRIEF,
-    sections: CATEGORY_KB_SECTIONS[category].map((k) => all[k]),
-    guidance: RESPONSE_GUIDANCE[category].slice(0, 2),
+    sections: categoryKbSections[category].map((k) => all[k]),
+    guidance: responseGuidance[category].slice(0, 2),
   };
 }

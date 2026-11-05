@@ -1,19 +1,19 @@
 import { z } from "zod";
 import {
-  DEFAULT_QUEUE_SORT,
-  GENERAL_BOOK_OPTION,
-  QUEUE_ASSIGNEE_FILTERS,
-  QUEUE_SORTS,
-  TICKET_CATEGORIES,
-  TICKET_PRIORITIES,
-  TICKET_STATUSES,
+  defaultQueueSort,
+  generalBookOption,
+  queueAssigneeFilters,
+  queueSorts,
+  ticketCategories,
+  ticketPriorities,
+  ticketStatuses,
 } from "../constants/ticket";
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid id");
 
 /** Author → create ticket. `bookId` is a Mongo id or "GENERAL" for account-level queries. */
 export const createTicketSchema = z.object({
-  bookId: z.union([objectId, z.literal(GENERAL_BOOK_OPTION)]),
+  bookId: z.union([objectId, z.literal(generalBookOption)]),
   subject: z.string().trim().min(5, "Subject must be at least 5 characters").max(150),
   description: z
     .string()
@@ -47,9 +47,9 @@ export type CreateNoteInput = z.infer<typeof createNoteSchema>;
 /** Admin → partial update. `assigneeId: "me"` assigns to the caller, `null` unassigns. */
 export const updateTicketSchema = z
   .object({
-    status: z.enum(TICKET_STATUSES).optional(),
-    category: z.enum(TICKET_CATEGORIES).optional(),
-    priority: z.enum(TICKET_PRIORITIES).optional(),
+    status: z.enum(ticketStatuses).optional(),
+    category: z.enum(ticketCategories).optional(),
+    priority: z.enum(ticketPriorities).optional(),
     assigneeId: z.union([objectId, z.literal("me"), z.null()]).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
@@ -66,15 +66,15 @@ const csvEnum = <T extends readonly [string, ...string[]]>(values: T) =>
 
 /** Admin queue filters (query string). Multi-value filters are comma-separated. */
 export const adminTicketQuerySchema = z.object({
-  status: csvEnum(TICKET_STATUSES),
-  category: csvEnum(TICKET_CATEGORIES),
-  priority: csvEnum(TICKET_PRIORITIES),
-  assignee: z.union([z.enum(QUEUE_ASSIGNEE_FILTERS), objectId]).optional(),
+  status: csvEnum(ticketStatuses),
+  category: csvEnum(ticketCategories),
+  priority: csvEnum(ticketPriorities),
+  assignee: z.union([z.enum(queueAssigneeFilters), objectId]).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   q: z.string().trim().max(100).optional(),
   /** urgency = priority desc then oldest first (default); newest / oldest = by createdAt */
-  sort: z.enum(QUEUE_SORTS).default(DEFAULT_QUEUE_SORT),
+  sort: z.enum(queueSorts).default(defaultQueueSort),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });

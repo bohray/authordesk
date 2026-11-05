@@ -65,7 +65,7 @@ export function kbSections(p: PublisherNames): Record<KbSectionKey, string> {
 }
 
 /** Which KB sections each category's draft prompt receives (beyond OVERVIEW_BRIEF). */
-export const CATEGORY_KB_SECTIONS = {
+export const categoryKbSections = {
   ROYALTY_PAYMENTS: ["ROYALTY"],
   ISBN_METADATA: ["ISBN", "METADATA_UPDATES"],
   PRINTING_QUALITY: ["PRINTING"],
@@ -78,7 +78,7 @@ export const CATEGORY_KB_SECTIONS = {
  * Category definitions used by the classifier. They mirror the KB scope so classification and
  * drafting agree on what each category covers.
  */
-export const CATEGORY_DEFINITIONS: Record<keyof typeof CATEGORY_KB_SECTIONS, string> = {
+export const categoryDefinitions: Record<keyof typeof categoryKbSections, string> = {
   ROYALTY_PAYMENTS:
     "Royalty amounts, payouts, missing/late payments, royalty calculation or breakdown, bank transfer issues.",
   ISBN_METADATA:

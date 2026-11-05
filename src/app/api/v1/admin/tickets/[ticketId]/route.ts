@@ -1,6 +1,6 @@
-import { withApi } from "@/server/http/with-api";
+import { withApi } from "@/server/http/withApi";
 import { ok } from "@/server/http/responses";
-import { getTicketDetail, updateTicketAsAdmin } from "@/server/services/admin-ticket.service";
+import { getTicketDetail, updateTicketAsAdmin } from "@/server/services/adminTicket.service";
 import { ticketIdParamSchema, updateTicketSchema } from "@/shared/schemas/ticket.schema";
 
 export const runtime = "nodejs";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AdminTicketView } from "@/features/admin-ticket/components/admin-ticket-view";
+import { AdminTicketView } from "@/features/admin-ticket/components/AdminTicketView";
 
 export const metadata: Metadata = { title: "Ticket" };
 

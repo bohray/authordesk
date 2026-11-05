@@ -9,13 +9,13 @@ import "server-only";
  * Implementation map:
  *  - classifier.service.ts  AI classification with rule-engine fallback
  *  - drafter.service.ts     cached, KB-grounded reply drafts
- *  - llm-client.ts          timeout / retry / provider fallback / circuit breaker / usage logging
- *  - context/build-facts.ts all numbers & dates computed in code (never by the model)
+ *  - llmClient.ts          timeout / retry / provider fallback / circuit breaker / usage logging
+ *  - context/buildFacts.ts all numbers & dates computed in code (never by the model)
  */
 import type { DraftDTO } from "@/shared/types/dto";
 import { classifyTicketImpl } from "./classifier.service";
 import { getDraftForTicketImpl } from "./drafter.service";
-import { hasConfiguredProvider } from "./llm-client";
+import { hasConfiguredProvider } from "./llmClient";
 
 /**
  * Classify a ticket's category + priority and persist the result on the ticket
@@ -62,5 +62,5 @@ export function isAiConfigured(): boolean {
 }
 
 /** Shared payout schedule maths (quarter end + 45 days), e.g. for MyBooksDTO.nextPayoutDate. */
-export { getNextPayoutDate } from "./context/build-facts";
-export { PAYOUT_THRESHOLD_INR } from "./knowledge-base/publisher";
+export { getNextPayoutDate } from "./context/buildFacts";
+export { payoutThresholdInr } from "./knowledge-base/publisher";

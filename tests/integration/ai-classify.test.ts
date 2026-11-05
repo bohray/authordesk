@@ -1,8 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { classifyTicket } from "@/server/ai";
-import { setLLMClientOverrides } from "@/server/ai/llm-client";
-import type { LLMProvider, LLMRequest } from "@/server/ai/providers/llm-provider";
-import { flushUsageLogs } from "@/server/ai/usage-logger";
+import { setLLMClientOverrides } from "@/server/ai/llmClient";
+import type { LLMProvider, LLMRequest } from "@/server/ai/providers/llmProvider";
+import { flushUsageLogs } from "@/server/ai/usageLogger";
 import { AiUsageLog, Book, Ticket, TicketEvent, User } from "@/server/db/models";
 import { startTestDb, stopTestDb } from "../helpers/test-db";
 

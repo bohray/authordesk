@@ -82,21 +82,21 @@ authordesk/
 │   │   ├── services/                         # business logic + ownership rules
 │   │   │   └── {auth,book,ticket,admin-ticket,stats}.service.ts
 │   │   ├── http/
-│   │   │   ├── with-api.ts                   # wrapper: auth → role → zod validate → handler → error mapping
+│   │   │   ├── withApi.ts                   # wrapper: auth → role → zod validate → handler → error mapping
 │   │   │   ├── errors.ts                     # AppError + error codes
 │   │   │   └── responses.ts                  # ok(), created(), paginated()
 │   │   ├── auth/{jwt.ts, password.ts, session.ts}
 │   │   ├── ai/
-│   │   │   ├── providers/{llm-provider.ts, gemini.provider.ts, groq.provider.ts}
-│   │   │   ├── llm-client.ts                 # timeout, retry/backoff, fallback chain, circuit breaker
+│   │   │   ├── providers/{llmProvider.ts, gemini.provider.ts, groq.provider.ts}
+│   │   │   ├── llmClient.ts                 # timeout, retry/backoff, fallback chain, circuit breaker
 │   │   │   ├── knowledge-base/               # KB split by category (.md) + tone guide + examples
 │   │   │   ├── prompts/{classify.prompt.ts, draft.prompt.ts}   # versioned
-│   │   │   ├── context/build-facts.ts        # deterministic facts (payout date, threshold, stage)
+│   │   │   ├── context/buildFacts.ts        # deterministic facts (payout date, threshold, stage)
 │   │   │   ├── classifier.service.ts         # AI → rule fallback
-│   │   │   ├── rule-classifier.ts
+│   │   │   ├── ruleClassifier.ts
 │   │   │   ├── drafter.service.ts
-│   │   │   └── usage-logger.ts
-│   │   └── lib/{logger.ts, rate-limit.ts}    # rate-limit backed by Mongo TTL collection
+│   │   │   └── usageLogger.ts
+│   │   └── lib/{logger.ts, rateLimit.ts}    # rate-limit backed by Mongo TTL collection
 │   │
 │   ├── shared/                               # ISOMORPHIC: safe for client + server
 │   │   ├── constants/{ticket.ts, roles.ts}   # status, category, priority enums + labels
@@ -108,53 +108,53 @@ authordesk/
 │   │   ├── ui/                               # shadcn primitives: button, input, select, textarea,
 │   │   │                                     #   dialog, table, card, badge, skeleton, toast, tabs
 │   │   ├── common/                           # app-wide reusable pieces built on ui/
-│   │   │   ├── status-badge.tsx  priority-badge.tsx  category-badge.tsx  age-badge.tsx
-│   │   │   ├── empty-state.tsx  loading-state.tsx  error-state.tsx
-│   │   │   ├── page-header.tsx  pagination.tsx  confirm-dialog.tsx
-│   │   │   └── currency.tsx  relative-time.tsx
-│   │   ├── forms/                            # form-field.tsx, file-picker.tsx, select-field.tsx
-│   │   └── layout/                           # app-shell.tsx, sidebar.tsx, topbar.tsx, user-menu.tsx,
-│   │                                         #   author-nav.tsx, admin-nav.tsx
+│   │   │   ├── StatusBadge.tsx  PriorityBadge.tsx  CategoryBadge.tsx  AgeBadge.tsx
+│   │   │   ├── EmptyState.tsx  LoadingState.tsx  ErrorState.tsx
+│   │   │   ├── PageHeader.tsx  Pagination.tsx  ConfirmDialog.tsx
+│   │   │   └── Currency.tsx  RelativeTime.tsx
+│   │   ├── forms/                            # FormField.tsx, FilePicker.tsx, SelectField.tsx
+│   │   └── layout/                           # AppShell.tsx, sidebar.tsx, topbar.tsx, UserMenu.tsx,
+│   │                                         #   AuthorNav.tsx, AdminNav.tsx
 │   │
 │   ├── features/                             # one folder per feature; each is self-contained
 │   │   ├── auth/
-│   │   │   ├── components/login-form.tsx
-│   │   │   ├── hooks/{use-login.ts, use-session.ts}
+│   │   │   ├── components/LoginForm.tsx
+│   │   │   ├── hooks/{use-login.ts, useSession.ts}
 │   │   │   └── api.ts                        # calls to /api/v1/auth/*
 │   │   ├── books/
-│   │   │   ├── components/{books-table.tsx, book-card.tsx, royalty-summary.tsx, production-status.tsx}
-│   │   │   ├── hooks/use-my-books.ts
+│   │   │   ├── components/{books-table.tsx, book-card.tsx, RoyaltySummary.tsx, production-status.tsx}
+│   │   │   ├── hooks/useMyBooks.ts
 │   │   │   ├── utils/royalty.ts              # totals, "below ₹1,000 threshold" helper
 │   │   │   └── api.ts
 │   │   ├── tickets/                          # author side
-│   │   │   ├── components/{ticket-form.tsx, ticket-list.tsx, ticket-card.tsx, ticket-thread.tsx}
+│   │   │   ├── components/{ticket-form.tsx, TicketList.tsx, ticket-card.tsx, ticket-thread.tsx}
 │   │   │   ├── hooks/{use-my-tickets.ts, use-ticket.ts, use-create-ticket.ts}
 │   │   │   └── api.ts
 │   │   ├── admin-queue/
-│   │   │   ├── components/{queue-table.tsx, queue-filters.tsx, queue-stats.tsx}
-│   │   │   ├── hooks/{use-admin-tickets.ts, use-queue-filters.ts}   # filters ↔ URL params
+│   │   │   ├── components/{QueueTable.tsx, QueueFilters.tsx, queue-stats.tsx}
+│   │   │   ├── hooks/{use-admin-tickets.ts, useQueueFilters.ts}   # filters ↔ URL params
 │   │   │   └── api.ts
 │   │   └── admin-ticket/
-│   │       ├── components/{ticket-detail.tsx, ai-draft-editor.tsx, classification-override.tsx,
-│   │       │               internal-notes.tsx, author-context-card.tsx, status-select.tsx, assign-button.tsx}
-│   │       ├── hooks/{use-admin-ticket.ts, use-draft.ts, use-update-ticket.ts, use-add-note.ts}
+│   │       ├── components/{TicketDetail.tsx, ai-draft-editor.tsx, classification-override.tsx,
+│   │       │               InternalNotes.tsx, author-context-card.tsx, status-select.tsx, assign-button.tsx}
+│   │       ├── hooks/{useAdminTicket.ts, use-draft.ts, use-update-ticket.ts, use-add-note.ts}
 │   │       └── api.ts
 │   │
 │   ├── constants/                            # FRONTEND-only constants
-│   │   ├── routes.ts                         # ROUTES.author.books, ROUTES.admin.ticket(id) …
-│   │   ├── query-keys.ts                     # TanStack Query key factory
-│   │   ├── ui.ts                             # POLL_INTERVAL_MS, PAGE_SIZE, badge colour maps
+│   │   ├── routes.ts                         # routes.author.books, routes.admin.ticket(id) …
+│   │   ├── queryKeys.ts                     # TanStack Query key factory
+│   │   ├── ui.ts                             # pollIntervalMs, pageSize, badge colour maps
 │   │   └── messages.ts                       # UI copy for empty/error states
 │   ├── hooks/                                # global hooks used across features
-│   │   ├── use-live-updates.ts               # visibility-aware polling → invalidate changed queries
-│   │   ├── use-debounce.ts
-│   │   └── use-document-visible.ts
+│   │   ├── useLiveUpdates.ts               # visibility-aware polling → invalidate changed queries
+│   │   ├── useDebounce.ts
+│   │   └── useDocumentVisible.ts
 │   ├── lib/                                  # framework-agnostic client helpers
-│   │   ├── api-client.ts                     # fetch wrapper: JSON, cookies, error → ApiError
-│   │   ├── query-client.ts
+│   │   ├── apiClient.ts                     # fetch wrapper: JSON, cookies, error → ApiError
+│   │   ├── queryClient.ts
 │   │   ├── format.ts                         # formatINR, formatDate, timeAgo
 │   │   └── utils.ts                          # cn() class merge
-│   ├── providers/                            # query-provider.tsx, toast-provider.tsx, app-providers.tsx
+│   ├── providers/                            # QueryProvider.tsx, toast-provider.tsx, AppProviders.tsx
 │   ├── types/                                # frontend view-model types (API DTO types come from shared/)
 │   ├── styles/globals.css
 │   └── middleware.ts                         # page guards: /author/* AUTHOR, /admin/* ADMIN
@@ -344,7 +344,7 @@ Route handlers contain no logic. Client code never imports `src/server/*`; the `
 |---|---|
 | 1 | Scaffold Next.js + tooling, env config, Mongo connection + models, seed script, auth + middleware + `withApi`, My Books (P0 1–3) |
 | 2 | Ticket services + APIs for both roles, author and admin UIs, notes/assign/status, live polling (P0 4–6, 9; P1 12) |
-| 3 | AI layer: providers, llm-client, KB, prompts, classifier, drafter, fallbacks, usage logs, override UI (P0 7, 8, 10; P1 14, 15) |
+| 3 | AI layer: providers, llmClient, KB, prompts, classifier, drafter, fallbacks, usage logs, override UI (P0 7, 8, 10; P1 14, 15) |
 | 4 | Tests + CI, OpenAPI/Swagger, Vercel + Atlas deploy, README + WRITEUP, P2 items (P0 11; P1 13, 16, 17) |
 
 ## 9. Verification

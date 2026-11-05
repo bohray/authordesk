@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextPayoutDate } from "@/server/services/royalty-schedule";
+import { nextPayoutDate } from "@/server/services/royaltySchedule";
 
 const at = (d: string) => new Date(`${d}T10:00:00.000Z`);
 

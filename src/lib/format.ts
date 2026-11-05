@@ -83,14 +83,14 @@ export function timeAgo(value: string | Date | null | undefined, now = Date.now(
   return formatDate(d);
 }
 
-const KB = 1024;
-const MB = KB * 1024;
+const bytesPerKb = 1024;
+const bytesPerMb = bytesPerKb * 1024;
 
 /** "512 B", "1.5 KB", "10 MB" (a trailing ".0" is dropped). */
 export function formatBytes(bytes: number | null | undefined): string {
   const b = bytes ?? 0;
-  if (b < KB) return `${b} B`;
-  const [value, unit] = b < MB ? [b / KB, "KB"] : [b / MB, "MB"];
+  if (b < bytesPerKb) return `${b} B`;
+  const [value, unit] = b < bytesPerMb ? [b / bytesPerKb, "KB"] : [b / bytesPerMb, "MB"];
   return `${value.toFixed(1).replace(/\.0$/, "")} ${unit}`;
 }
 
@@ -100,11 +100,11 @@ export function plural(count: number, word: string, pluralWord = `${word}s`): st
 }
 
 /** Label for tickets that aren't about a specific book. */
-export const GENERAL_BOOK_LABEL = "General / Account Level";
+export const generalBookLabel = "General / Account Level";
 
 /** Book title for a ticket, or the account-level label when no book is attached. */
 export function bookLabel(book: { title: string } | null | undefined): string {
-  return book?.title || GENERAL_BOOK_LABEL;
+  return book?.title || generalBookLabel;
 }
 
 /** "In Production - Cover Design" → "In Production · Cover Design" */

@@ -1,5 +1,5 @@
 /** UI copy kept in one place so tone stays consistent. */
-export const MESSAGES = {
+export const uiMessages = {
   genericError: "Something went wrong. Please try again.",
   networkError: "Can't reach the server. Check your connection and try again.",
   sessionExpired: "Your session has expired. Please sign in again.",

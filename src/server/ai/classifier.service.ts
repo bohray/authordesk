@@ -3,25 +3,25 @@ import mongoose from "mongoose";
 import { connectDB } from "@/server/db/connect";
 import { Ticket, TicketEvent } from "@/server/db/models";
 import { logger } from "@/server/lib/logger";
-import { PRIORITY_RANK, type TicketCategory, type TicketPriority } from "@/shared/constants/ticket";
-import { computeFacts, renderClassifyContext, type RoyaltyFacts } from "./context/build-facts";
-import { loadTicketContext } from "./context/load-context";
+import { priorityRankByLevel, type TicketCategory, type TicketPriority } from "@/shared/constants/ticket";
+import { computeFacts, renderClassifyContext, type RoyaltyFacts } from "./context/buildFacts";
+import { loadTicketContext } from "./context/loadContext";
 import { publisherNames } from "./knowledge-base/publisher";
-import { callLLM } from "./llm-client";
+import { callLLM } from "./llmClient";
 import {
-  CLASSIFY_JSON_SCHEMA,
-  CLASSIFY_MAX_OUTPUT_TOKENS,
-  CLASSIFY_PROMPT_VERSION,
-  CLASSIFY_RETRY_SUFFIX,
+  classifyJsonSchema,
+  classifyMaxOutputTokens,
+  classifyPromptVersion,
+  classifyRetrySuffix,
   buildClassifySystemPrompt,
   buildClassifyUserPrompt,
   parseClassification,
 } from "./prompts/classify.prompt";
-import { isLLMError, type LLMErrorKind } from "./providers/llm-provider";
-import { RULE_ENGINE_MODEL, ruleClassify } from "./rule-classifier";
+import { isLLMError, type LLMErrorKind } from "./providers/llmProvider";
+import { ruleEngineModel, ruleClassify } from "./ruleClassifier";
 
 /** A second classify call for the same ticket within this window is a duplicate and is dropped. */
-const CLAIM_WINDOW_MS = 30_000;
+const claimWindowMs = 30_000;
 
 interface Outcome {
   source: "AI" | "RULE";
@@ -64,7 +64,7 @@ export async function classifyTicketImpl(ticketId: string): Promise<void> {
       {
         _id: ticketId,
         $nor: [{ categorySource: "ADMIN", prioritySource: "ADMIN" }],
-        $or: [{ "ai.lastAttemptAt": null }, { "ai.lastAttemptAt": { $lt: new Date(now.getTime() - CLAIM_WINDOW_MS) } }],
+        $or: [{ "ai.lastAttemptAt": null }, { "ai.lastAttemptAt": { $lt: new Date(now.getTime() - claimWindowMs) } }],
       },
       { $set: { "ai.lastAttemptAt": now }, $inc: { "ai.attempts": 1 } },
       { returnDocument: "after", projection: { _id: 1 } },
@@ -94,7 +94,7 @@ export async function classifyTicketImpl(ticketId: string): Promise<void> {
       category: outcome.category,
       priority: outcome.priority,
       ms: Date.now() - startedAt,
-      promptVersion: CLASSIFY_PROMPT_VERSION,
+      promptVersion: classifyPromptVersion,
     });
   } catch (err) {
     // Last-resort guard (e.g. DB hiccup mid-flight). Never propagate to the request.
@@ -127,10 +127,10 @@ async function classifyWithFallback(
         ticketId,
         tier: "small",
         system,
-        user: attempt === 0 ? user : user + CLASSIFY_RETRY_SUFFIX,
+        user: attempt === 0 ? user : user + classifyRetrySuffix,
         responseFormat: "json",
-        jsonSchema: CLASSIFY_JSON_SCHEMA,
-        maxOutputTokens: CLASSIFY_MAX_OUTPUT_TOKENS,
+        jsonSchema: classifyJsonSchema,
+        maxOutputTokens: classifyMaxOutputTokens,
         temperature: 0, // deterministic triage: same ticket → same label
         parse: parseClassification,
       });
@@ -143,7 +143,7 @@ async function classifyWithFallback(
   }
 
   const rule = ruleClassify(t, { royalty: t.royalty });
-  return { source: "RULE", ...rule, model: RULE_ENGINE_MODEL, error: errorMessage(lastKind, lastDetail) };
+  return { source: "RULE", ...rule, model: ruleEngineModel, error: errorMessage(lastKind, lastDetail) };
 }
 
 async function persist(
@@ -166,7 +166,7 @@ async function persist(
       {
         updateOne: {
           filter: { _id, prioritySource: { $ne: "ADMIN" } },
-          update: { $set: { priority: o.priority, prioritySource: o.source, priorityRank: PRIORITY_RANK[o.priority] } },
+          update: { $set: { priority: o.priority, prioritySource: o.source, priorityRank: priorityRankByLevel[o.priority] } },
         },
       },
       {

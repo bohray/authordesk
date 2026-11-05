@@ -1,5 +1,5 @@
-import { BooksPageHeader } from "@/features/books/components/books-page-header";
-import { BooksSkeleton } from "@/features/books/components/books-skeleton";
+import { BooksPageHeader } from "@/features/books/components/BooksPageHeader";
+import { BooksSkeleton } from "@/features/books/components/BooksSkeleton";
 
 export default function Loading() {
   return (

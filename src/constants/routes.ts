@@ -1,7 +1,7 @@
 import type { Role } from "@/shared/constants/roles";
 
 /** Page routes (frontend navigation). */
-export const ROUTES = {
+export const routes = {
   home: "/",
   login: "/login",
   author: {
@@ -19,13 +19,13 @@ export const ROUTES = {
 } as const;
 
 export function homeForRole(role: Role): string {
-  return role === "ADMIN" ? ROUTES.admin.tickets : ROUTES.author.books;
+  return role === "ADMIN" ? routes.admin.tickets : routes.author.books;
 }
 
-/** REST API paths, relative to API_BASE. */
-export const API_BASE = "/api/v1";
+/** REST API paths, relative to apiBase. */
+export const apiBase = "/api/v1";
 
-export const API_ROUTES = {
+export const apiRoutes = {
   auth: {
     login: "/auth/login",
     logout: "/auth/logout",

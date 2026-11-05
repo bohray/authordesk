@@ -11,14 +11,14 @@ Everything lives in `src/server/ai/`. Business code imports only `@/server/ai`, 
 index.ts                 public contract (thin wrappers that never throw)
 classifier.service.ts    claim → LLM (small model) → Zod → rule fallback → guarded persist → event
 drafter.service.ts       cache check → facts + KB → LLM (larger model) → validate → upsert AiDraft
-llm-client.ts            timeout, retry/backoff, Gemini→Groq fallback, circuit breaker, usage logging
+llmClient.ts            timeout, retry/backoff, Gemini→Groq fallback, circuit breaker, usage logging
 providers/               LLMProvider interface + Gemini (@google/genai) + Groq (fetch)
 prompts/                 classify.prompt.ts (classify-v1), draft.prompt.ts (draft-v1), sanitize.ts
 knowledge-base/          KB policy sections, tone guide, sample Q→A guidance (TS strings, templated)
-context/build-facts.ts   PURE: payout dates, threshold/overdue logic, stage, platforms, ages
-context/load-context.ts  loads ticket + book + author → FactsInput
-rule-classifier.ts       deterministic keyword/regex fallback
-usage-logger.ts          fire-and-forget AiUsageLog writes
+context/buildFacts.ts   PURE: payout dates, threshold/overdue logic, stage, platforms, ages
+context/loadContext.ts  loads ticket + book + author → FactsInput
+ruleClassifier.ts       deterministic keyword/regex fallback
+usageLogger.ts          fire-and-forget AiUsageLog writes
 ```
 
 ## 1. Prompt strategy
@@ -81,7 +81,7 @@ The output goes through `cleanDraft`, which strips stray markdown and **rejects*
 
 ## 2. Knowledge base retrieval
 
-The KB is about one page, so retrieval is a **deterministic lookup from category to KB section** (`CATEGORY_KB_SECTIONS`). Embeddings or a vector store would add cost, latency, a new dependency and new ways to fail, with no gain in recall. The category is already computed and is the best possible key.
+The KB is about one page, so retrieval is a **deterministic lookup from category to KB section** (`categoryKbSections`). Embeddings or a vector store would add cost, latency, a new dependency and new ways to fail, with no gain in recall. The category is already computed and is the best possible key.
 
 | Category | Sections included |
 |---|---|
@@ -100,7 +100,7 @@ If a ticket has not been classified yet, the drafter picks KB sections using the
 
 ## 3. The facts block: no arithmetic and no invented dates
 
-`context/build-facts.ts` is pure and fully unit-tested. It computes the following:
+`context/buildFacts.ts` is pure and fully unit-tested. It computes the following:
 
 - **Next payout date**: the first "quarter end + 45 days" on or after today. Payouts fall on 15 May, 14 Aug, 14 Nov and 14 Feb. For example, today 2026-11-05 gives 2026-11-14, and 2026-11-20 gives 2027-02-14.
 - **Royalty assessment**: whether the pending amount is at or above ₹1,000, whether the book has never been paid, the days since the last payout, and the number of payout runs missed. A run counts as missed only if it falls after the last payout, or after the first quarter that ended after publication. The result is one of these states:
@@ -181,7 +181,7 @@ It also uses the computed royalty facts: a long-overdue payout becomes CRITICAL,
 ## 8. Evaluating accuracy
 
 - **Override rate (built in)**: `ai.suggestedCategory` and `ai.suggestedPriority` are always stored, even when an admin value wins. The override rate is the share of `categorySource="AI"` tickets that later become `ADMIN` with a final value different from the suggestion. It is reported in `AdminStatsDTO.ai.overrideRate` and can be broken down by category, model and prompt version. The **fallback rate** (the share of `RULE` sources) and **failure rate** come from `AiUsageLog`.
-- **Offline evaluation set**: the 7 KB sample queries plus seeded and real tickets labelled by ops. Run both the LLM and the rule engine on them, and report category accuracy and priority accuracy (exact match, and within one level), plus a confusion matrix. Changes to the prompt bump `CLASSIFY_PROMPT_VERSION` / `DRAFT_PROMPT_VERSION`, so results can be compared per version.
+- **Offline evaluation set**: the 7 KB sample queries plus seeded and real tickets labelled by ops. Run both the LLM and the rule engine on them, and report category accuracy and priority accuracy (exact match, and within one level), plus a confusion matrix. Changes to the prompt bump `classifyPromptVersion` / `draftPromptVersion`, so results can be compared per version.
 - **Draft quality**:
   - **Edit distance** between the AI draft and the reply actually sent (messages are flagged `aiAssisted`);
   - a periodic human rubric: correct facts, tone, a clear next step, and a timeline given;
