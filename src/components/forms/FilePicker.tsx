@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type ChangeEvent } from "react";
 import { FileText, Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatBytes } from "@/lib/format";
@@ -34,10 +34,11 @@ export function FilePicker({
 }) {
   const fallbackId = useId();
   const inputId = id ?? fallbackId;
+  const descriptionId = `${inputId}-desc`;
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file
     if (!file) return;
@@ -48,6 +49,8 @@ export function FilePicker({
     setError(null);
     onChange({ name: file.name, size: file.size, type: file.type || undefined });
   };
+  const handleRemove = () => onChange(null);
+  const handleBrowse = () => inputRef.current?.click();
 
   return (
     <div className="space-y-1.5">
@@ -59,7 +62,7 @@ export function FilePicker({
         accept={accept}
         onChange={handleChange}
         disabled={disabled}
-        aria-describedby={`${inputId}-desc`}
+        aria-describedby={descriptionId}
       />
       {value ? (
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
@@ -72,7 +75,7 @@ export function FilePicker({
             type="button"
             variant="ghost"
             size="icon-sm"
-            onClick={() => onChange(null)}
+            onClick={handleRemove}
             disabled={disabled}
             aria-label={`Remove ${value.name}`}
           >
@@ -80,18 +83,13 @@ export function FilePicker({
           </Button>
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => inputRef.current?.click()}
-          disabled={disabled}
-        >
+        <Button type="button" variant="outline" onClick={handleBrowse} disabled={disabled}>
           <Paperclip aria-hidden />
           Attach a file
         </Button>
       )}
       <p
-        id={`${inputId}-desc`}
+        id={descriptionId}
         className={cn("text-xs", error ? "text-destructive" : "text-muted-foreground")}
         role={error ? "alert" : undefined}
       >

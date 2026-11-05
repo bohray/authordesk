@@ -1,14 +1,7 @@
 import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/Table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { cn } from "@/lib/utils";
 
 /**
@@ -49,6 +42,10 @@ export function TextSkeleton({ lines = 3, className }: { lines?: number; classNa
   );
 }
 
+/** Extra side padding on a table's first and last columns, matching the real tables. */
+const edgeCellClass = (index: number, lastIndex: number) =>
+  cn(index === 0 && "pl-4", index === lastIndex && "pr-4");
+
 /** Cell widths cycle so rows don't look like a barcode. */
 const cellWidths = ["w-16", "w-40", "w-28", "w-24", "w-20", "w-32"];
 
@@ -76,7 +73,7 @@ export function TableSkeleton({
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             {columns.map((c, i) => (
-              <TableHead key={c || i} className={cn(i === 0 && "pl-4", i === last && "pr-4")}>
+              <TableHead key={c || i} className={edgeCellClass(i, last)}>
                 {c ? c : <span className="sr-only">Actions</span>}
               </TableHead>
             ))}
@@ -86,7 +83,7 @@ export function TableSkeleton({
           {range(rows).map((r) => (
             <TableRow key={r} className={cn("hover:bg-transparent", rowClassName)}>
               {columns.map((c, i) => (
-                <TableCell key={c || i} className={cn(i === 0 && "pl-4", i === last && "pr-4")}>
+                <TableCell key={c || i} className={edgeCellClass(i, last)}>
                   <Skeleton className={cn("h-4", cellWidths[(i + r) % cellWidths.length])} />
                 </TableCell>
               ))}
@@ -225,10 +222,7 @@ export function DetailSkeleton({
   label?: string;
 }) {
   return (
-    <LoadingRegion
-      label={label}
-      className={cn("grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]", className)}
-    >
+    <LoadingRegion label={label} className={cn("grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]", className)}>
       <div className="min-w-0 space-y-5">
         {main ?? (
           <>

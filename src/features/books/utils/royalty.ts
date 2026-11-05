@@ -1,5 +1,6 @@
 import { formatDate, formatINR } from "@/lib/format";
 import { uiMessages } from "@/constants/messages";
+import { payoutSummaryText } from "@/constants/books";
 import type { BookDTO, MyBooksDTO } from "@/shared/types/dto";
 
 export type NoteTone = "info" | "warn" | "muted";
@@ -28,15 +29,14 @@ export function getRoyaltyNotes(book: BookDTO, threshold: number): RoyaltyNote[]
 export function getPayoutSummary(data: MyBooksDTO): { text: string; tone: NoteTone } {
   const { pending } = data.totals;
   const threshold = formatINR(data.payoutThreshold);
-  const date = formatDate(data.nextPayoutDate);
   if (pending <= 0) {
-    return { tone: "muted", text: `Nothing pending right now. Payouts are made when pending royalty reaches ${threshold}.` };
+    return { tone: "muted", text: payoutSummaryText.nothingPending(threshold) };
   }
   if (pending < data.payoutThreshold) {
-    return {
-      tone: "warn",
-      text: `Your pending ${formatINR(pending)} is below the ${threshold} threshold and rolls over to the next quarter.`,
-    };
+    return { tone: "warn", text: payoutSummaryText.belowThreshold(formatINR(pending), threshold) };
   }
-  return { tone: "info", text: `${formatINR(pending)} is scheduled for ${date}. Minimum payout is ${threshold}.` };
+  return {
+    tone: "info",
+    text: payoutSummaryText.scheduled(formatINR(pending), formatDate(data.nextPayoutDate), threshold),
+  };
 }

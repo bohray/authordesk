@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,12 +14,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 import { buttonVariants } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-
-const options = [
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
-  { value: "system", label: "System", Icon: Monitor },
-] as const;
+import { defaultTheme, themeOptions } from "@/constants/layout";
 
 const noopSubscribe = () => () => {};
 
@@ -36,8 +31,10 @@ function useMounted() {
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const mounted = useMounted();
-  const current = mounted ? (theme ?? "system") : "system";
-  const TriggerIcon = !mounted ? Sun : resolvedTheme === "dark" ? Moon : Sun;
+  // Before hydration the theme is unknown, so render the server's defaults to avoid a mismatch.
+  const current = mounted ? (theme ?? defaultTheme) : defaultTheme;
+  const TriggerIcon = mounted && resolvedTheme === "dark" ? Moon : Sun;
+  const handleThemeChange = (value: unknown) => setTheme(String(value));
 
   return (
     <DropdownMenu>
@@ -54,8 +51,8 @@ export function ThemeToggle({ className }: { className?: string }) {
       <DropdownMenuContent align="end" className="w-40">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Theme</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={current} onValueChange={(v) => setTheme(String(v))}>
-            {options.map(({ value, label, Icon }) => (
+          <DropdownMenuRadioGroup value={current} onValueChange={handleThemeChange}>
+            {themeOptions.map(({ value, label, icon: Icon }) => (
               <DropdownMenuRadioItem key={value} value={value}>
                 <Icon aria-hidden />
                 {label}

@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { CardGridSkeleton, LoadingRegion, TableSkeleton } from "@/components/common/Skeletons";
-import { bookTableColumns, summaryCardCount, summaryCardClass } from "@/features/books/components/layout";
+import { bookCardFields, bookTableColumns, summaryCardClass, summaryCardCount } from "@/constants/books";
 
 const rowCount = 4;
 
@@ -33,8 +33,8 @@ export function BooksSkeleton() {
                     <Skeleton className="h-3 w-32" />
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                    {Array.from({ length: 8 }, (_, j) => (
-                      <div key={j} className="space-y-1">
+                    {bookCardFields.map((field) => (
+                      <div key={field} className="space-y-1">
                         <Skeleton className="h-3 w-14" />
                         <Skeleton className="h-4 w-20" />
                       </div>

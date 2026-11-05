@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/utils";
 
-/** Label + control + hint/error, wired up for screen readers via `${id}-hint` / `${id}-error`. */
+const hintId = (id: string) => `${id}-hint`;
+const errorId = (id: string) => `${id}-error`;
+
+/** Label + control + hint/error, wired up for screen readers via `describedBy()`. */
 export function FormField({
   id,
   label,
@@ -38,11 +41,11 @@ export function FormField({
       </div>
       {children}
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
+        <p id={errorId(id)} role="alert" className="text-xs text-destructive">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+        <p id={hintId(id)} className="text-xs text-muted-foreground">
           {hint}
         </p>
       ) : null}
@@ -52,7 +55,7 @@ export function FormField({
 
 /** aria-describedby value matching FormField's hint/error ids. */
 export function describedBy(id: string, opts: { error?: string; hint?: boolean }) {
-  if (opts.error) return `${id}-error`;
-  if (opts.hint) return `${id}-hint`;
+  if (opts.error) return errorId(id);
+  if (opts.hint) return hintId(id);
   return undefined;
 }

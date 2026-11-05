@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { formatBookStatus } from "@/lib/format";
+import { bookStatusBadgeClasses } from "@/constants/books";
 
 export function BookStatusBadge({
   status,
@@ -16,9 +17,7 @@ export function BookStatusBadge({
       variant="outline"
       className={cn(
         "border-0",
-        isPublished
-          ? "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/25"
-          : "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/25 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-400/25",
+        isPublished ? bookStatusBadgeClasses.published : bookStatusBadgeClasses.inProduction,
         className,
       )}
     >

@@ -6,9 +6,17 @@ import { useNow } from "@/components/common/RelativeTime";
 import { cn } from "@/lib/utils";
 import { formatAge, formatDateTime, hoursSince } from "@/lib/format";
 import { ageDangerHours, ageWarnHours } from "@/constants/ui";
+import { ticketAgeBadgeClasses, type TicketAgeLevel } from "@/constants/tickets";
 import { unresolvedStatuses, type TicketStatus } from "@/shared/constants/ticket";
 
-/** Ticket age. Unresolved tickets turn amber after 24h and red after 48h. */
+function ageLevel(status: TicketStatus, hours: number): TicketAgeLevel {
+  if (!unresolvedStatuses.includes(status)) return "resolved";
+  if (hours > ageDangerHours) return "danger";
+  if (hours > ageWarnHours) return "warn";
+  return "fresh";
+}
+
+/** Ticket age. Unresolved tickets turn amber after `ageWarnHours` and red after `ageDangerHours`. */
 export function AgeBadge({
   createdAt,
   status,
@@ -19,19 +27,11 @@ export function AgeBadge({
   className?: string;
 }) {
   const now = useNow();
-  const unresolved = unresolvedStatuses.includes(status);
-  const hours = hoursSince(createdAt, now);
-  const tone = !unresolved
-    ? "bg-muted text-muted-foreground"
-    : hours > ageDangerHours
-      ? "bg-red-50 text-red-800 ring-1 ring-inset ring-red-600/25 dark:bg-red-500/15 dark:text-red-200 dark:ring-red-400/35"
-      : hours > ageWarnHours
-        ? "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/25 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-400/25"
-        : "bg-muted text-foreground ring-1 ring-inset ring-border";
+  const level = ageLevel(status, hoursSince(createdAt, now));
   return (
     <Badge
       variant="outline"
-      className={cn("border-0 tabular-nums", tone, className)}
+      className={cn("border-0 tabular-nums", ticketAgeBadgeClasses[level], className)}
       title={`Created ${formatDateTime(createdAt)}`}
     >
       <Clock aria-hidden />

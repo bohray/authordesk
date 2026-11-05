@@ -1,31 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { BookMarked, LifeBuoy, Plus } from "lucide-react";
-import { NavLinks, type NavItem } from "@/components/layout/NavLinks";
+import { Plus } from "lucide-react";
+import { NavLinks } from "@/components/layout/NavLinks";
 import { buttonVariants } from "@/components/ui/Button";
+import { authorNavItems } from "@/constants/layout";
 import { routes } from "@/constants/routes";
 
-const navItems: NavItem[] = [
-  { href: routes.author.books, label: "My Books", icon: BookMarked },
-  {
-    href: routes.author.tickets,
-    label: "My Tickets",
-    icon: LifeBuoy,
-    exclude: [routes.author.newTicket()],
-  },
-];
+const newTicketLabel = "New Ticket";
 
 export function AuthorNav() {
-  return <NavLinks items={navItems} label="Author navigation" />;
+  return <NavLinks items={authorNavItems} label="Author navigation" />;
 }
 
+/** Top-bar shortcut; icon-only on phones, with the label kept for screen readers. */
 export function NewTicketButton() {
   return (
     <Link href={routes.author.newTicket()} className={buttonVariants({ size: "sm" })}>
       <Plus aria-hidden />
-      <span className="hidden sm:inline">New Ticket</span>
-      <span className="sr-only sm:hidden">New Ticket</span>
+      <span className="hidden sm:inline">{newTicketLabel}</span>
+      <span className="sr-only sm:hidden">{newTicketLabel}</span>
     </Link>
   );
 }

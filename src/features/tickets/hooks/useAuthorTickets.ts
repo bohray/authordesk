@@ -1,17 +1,12 @@
 "use client";
 
 import { useCallback } from "react";
-import {
-  keepPreviousData,
-  queryOptions,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/constants/queryKeys";
 import { queryStaleMs } from "@/lib/queryClient";
 import { authorTicketsApi } from "@/features/tickets/api";
 import type { CreateTicketInput } from "@/shared/schemas/ticket.schema";
+import type { AuthorTicketDTO } from "@/shared/types/dto";
 
 export function useMyTickets(page: number, limit: number) {
   return useQuery({
@@ -48,25 +43,29 @@ export function useBookOptions() {
   });
 }
 
-export function useCreateTicket() {
+/** After a write: seed the detail cache with the server's copy and refresh every list page. */
+function useCacheUpdatedTicket() {
   const queryClient = useQueryClient();
+  return (ticket: AuthorTicketDTO) => {
+    queryClient.setQueryData(queryKeys.authorTickets.detail(ticket.id), ticket);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.authorTickets.lists() });
+  };
+}
+
+export function useCreateTicket() {
+  const cacheUpdatedTicket = useCacheUpdatedTicket();
   return useMutation({
     mutationFn: (input: CreateTicketInput) => authorTicketsApi.create(input),
-    onSuccess: (ticket) => {
-      queryClient.setQueryData(queryKeys.authorTickets.detail(ticket.id), ticket);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.authorTickets.lists() });
-    },
+    onSuccess: cacheUpdatedTicket,
   });
 }
 
 export function useReplyToTicket(ticketId: string) {
   const queryClient = useQueryClient();
+  const cacheUpdatedTicket = useCacheUpdatedTicket();
   return useMutation({
     mutationFn: (body: string) => authorTicketsApi.reply(ticketId, body),
-    onSuccess: (ticket) => {
-      queryClient.setQueryData(queryKeys.authorTickets.detail(ticketId), ticket);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.authorTickets.lists() });
-    },
+    onSuccess: cacheUpdatedTicket,
     onError: () => {
       // e.g. 409 when the ticket was closed meanwhile: show the latest state.
       void queryClient.invalidateQueries({ queryKey: queryKeys.authorTickets.detail(ticketId) });

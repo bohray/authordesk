@@ -3,20 +3,13 @@ import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
 import { buttonVariants } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/Table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { BookStatusBadge } from "@/components/common/BookStatusBadge";
 import { Currency } from "@/components/common/Currency";
 import { routes } from "@/constants/routes";
 import { formatDate, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { bookTableColumns } from "@/features/books/components/layout";
+import { bookCardFields, bookTableColumns, numericBookColumns, type BookCardField } from "@/constants/books";
 import { RoyaltyNotes } from "@/features/books/components/RoyaltyNotes";
 import type { RoyaltyNote } from "@/features/books/utils/royalty";
 import type { BookDTO } from "@/shared/types/dto";
@@ -24,7 +17,7 @@ import type { BookDTO } from "@/shared/types/dto";
 /** Notes per book id, computed once by the parent and shared by the table and the cards. */
 export type NotesByBook = ReadonlyMap<string, RoyaltyNote[]>;
 
-const numericColumns: ReadonlySet<string> = new Set(["MRP", "Copies sold", "Earned", "Paid", "Pending"]);
+const lastColumnIndex = bookTableColumns.length - 1;
 
 function HelpLink({ bookId }: { bookId: string }) {
   return (
@@ -50,8 +43,8 @@ export function BooksTable({ books, notes }: { books: BookDTO[]; notes: NotesByB
                 key={label || "actions"}
                 className={cn(
                   i === 0 && "pl-4",
-                  i === bookTableColumns.length - 1 && "pr-4",
-                  numericColumns.has(label) && "text-right",
+                  i === lastColumnIndex && "pr-4",
+                  numericBookColumns.has(label) && "text-right",
                 )}
               >
                 {label || <span className="sr-only">Actions</span>}
@@ -105,17 +98,17 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Fields shown on each mobile card, in display order. */
-const cardFields: { label: string; render: (b: BookDTO) => ReactNode }[] = [
-  { label: "Genre", render: (b) => b.genre },
-  { label: "Published", render: (b) => formatDate(b.publicationDate) },
-  { label: "MRP", render: (b) => <Currency amount={b.mrp} /> },
-  { label: "Copies sold", render: (b) => formatNumber(b.copiesSold) },
-  { label: "Earned", render: (b) => <Currency amount={b.royalty.earned} /> },
-  { label: "Paid", render: (b) => <Currency amount={b.royalty.paid} /> },
-  { label: "Pending", render: (b) => <Currency amount={b.royalty.pending} className="font-medium" /> },
-  { label: "Last payout", render: (b) => formatDate(b.royalty.lastPayoutDate) },
-];
+/** How each mobile card field renders; exhaustive so a new field in `bookCardFields` can't be missed. */
+const cardFieldValue = {
+  Genre: (b) => b.genre,
+  Published: (b) => formatDate(b.publicationDate),
+  MRP: (b) => <Currency amount={b.mrp} />,
+  "Copies sold": (b) => formatNumber(b.copiesSold),
+  Earned: (b) => <Currency amount={b.royalty.earned} />,
+  Paid: (b) => <Currency amount={b.royalty.paid} />,
+  Pending: (b) => <Currency amount={b.royalty.pending} className="font-medium" />,
+  "Last payout": (b) => formatDate(b.royalty.lastPayoutDate),
+} satisfies Record<BookCardField, (b: BookDTO) => ReactNode>;
 
 /** Mobile / tablet: one card per book. */
 export function BookCards({ books, notes }: { books: BookDTO[]; notes: NotesByBook }) {
@@ -131,9 +124,9 @@ export function BookCards({ books, notes }: { books: BookDTO[]; notes: NotesByBo
                 <p className="font-mono text-xs text-muted-foreground">ISBN {b.isbn}</p>
               </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-                {cardFields.map((f) => (
-                  <Field key={f.label} label={f.label}>
-                    {f.render(b)}
+                {bookCardFields.map((field) => (
+                  <Field key={field} label={field}>
+                    {cardFieldValue[field](b)}
                   </Field>
                 ))}
               </dl>

@@ -8,6 +8,7 @@ import {
 } from "@/components/common/Skeletons";
 import { TicketTips } from "@/features/tickets/components/TicketTips";
 import { NewTicketPageHeader } from "@/features/tickets/components/TicketsPageHeader";
+import { newTicketLayoutClass } from "@/constants/tickets";
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 
@@ -104,7 +105,7 @@ export function TicketFormSkeleton() {
 /** Body of the new-ticket page: form card skeleton + the (static) tips sidebar. */
 export function NewTicketBodySkeleton() {
   return (
-    <LoadingRegion label="Loading form" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <LoadingRegion label="Loading form" className={newTicketLayoutClass}>
       <Card>
         <CardContent>
           <TicketFormSkeleton />

@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, BookOpen, CheckCircle2, Clock, FileText, Hourglass, Lock } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Hourglass,
+  Lock,
+  type LucideIcon,
+} from "lucide-react";
 import { buttonVariants } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ConversationThread } from "@/components/common/ConversationThread";
@@ -11,19 +20,21 @@ import { RelativeTime } from "@/components/common/RelativeTime";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { routes } from "@/constants/routes";
 import { uiMessages } from "@/constants/messages";
+import { ticketStatusHints } from "@/constants/tickets";
 import { bookLabel, formatBytes, formatDateTime } from "@/lib/format";
 import { isNotFoundError } from "@/lib/apiClient";
 import { useMyTicket } from "@/features/tickets/hooks/useAuthorTickets";
 import { ReplyForm } from "@/features/tickets/components/ReplyForm";
 import { TicketDetailSkeleton } from "@/features/tickets/components/TicketSkeletons";
 import type { TicketStatus } from "@/shared/constants/ticket";
+import type { AuthorTicketDTO } from "@/shared/types/dto";
 
-const statusHint: Record<TicketStatus, { icon: typeof Clock; text: string }> = {
-  OPEN: { icon: Hourglass, text: "We've received your ticket. A member of our team will reply here." },
-  IN_PROGRESS: { icon: Clock, text: "Our team is working on this. New replies appear here automatically." },
-  RESOLVED: { icon: CheckCircle2, text: "Marked resolved. Reply below if you still need help." },
-  CLOSED: { icon: Lock, text: "This ticket is closed." },
-};
+const statusHintIcons = {
+  OPEN: Hourglass,
+  IN_PROGRESS: Clock,
+  RESOLVED: CheckCircle2,
+  CLOSED: Lock,
+} satisfies Record<TicketStatus, LucideIcon>;
 
 function BackLink() {
   return (
@@ -34,6 +45,37 @@ function BackLink() {
       <ArrowLeft aria-hidden />
       My Tickets
     </Link>
+  );
+}
+
+/** What happens next for this status, shown under the title. */
+function StatusHint({ status }: { status: TicketStatus }) {
+  const Icon = statusHintIcons[status];
+  return (
+    <p className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm">
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+      {ticketStatusHints[status]}
+    </p>
+  );
+}
+
+function OriginalQueryCard({ ticket }: { ticket: AuthorTicketDTO }) {
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle className="text-sm text-muted-foreground">Your original query</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{ticket.description}</p>
+        {ticket.attachment && (
+          <p className="inline-flex items-center gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs">
+            <FileText className="size-3.5" aria-hidden />
+            {ticket.attachment.name}
+            <span className="text-muted-foreground">({formatBytes(ticket.attachment.size)})</span>
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -64,9 +106,6 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
     );
   }
 
-  const hint = statusHint[ticket.status];
-  const HintIcon = hint.icon;
-
   return (
     <div className="mx-auto max-w-3xl">
       <BackLink />
@@ -86,28 +125,11 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
             Opened <RelativeTime date={ticket.createdAt} />
           </span>
         </p>
-        <p className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm">
-          <HintIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-          {hint.text}
-        </p>
+        <StatusHint status={ticket.status} />
       </header>
 
       <div className="space-y-5">
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">Your original query</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{ticket.description}</p>
-            {ticket.attachment && (
-              <p className="inline-flex items-center gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs">
-                <FileText className="size-3.5" aria-hidden />
-                {ticket.attachment.name}
-                <span className="text-muted-foreground">({formatBytes(ticket.attachment.size)})</span>
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <OriginalQueryCard ticket={ticket} />
 
         <section aria-labelledby="conversation-heading" className="space-y-3">
           <h2 id="conversation-heading" className="text-sm font-medium text-muted-foreground">

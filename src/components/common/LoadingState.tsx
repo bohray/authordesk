@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Inline progress indicators. Layout-matching skeletons for first loads live in
- * `skeletons.tsx`; these are for work happening on screen that is already rendered.
+ * `Skeletons.tsx`; these are for work happening on screen that is already rendered.
  */
 
 /** Inline spinner with label. */

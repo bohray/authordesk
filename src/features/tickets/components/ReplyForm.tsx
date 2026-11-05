@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -10,10 +11,14 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Label } from "@/components/ui/Label";
 import { uiMessages } from "@/constants/messages";
 import { messageMax } from "@/constants/ui";
+import { replyCopy } from "@/constants/tickets";
 import { getErrorMessage } from "@/lib/apiClient";
 import { useReplyToTicket } from "@/features/tickets/hooks/useAuthorTickets";
 import { createMessageSchema, type CreateMessageInput } from "@/shared/schemas/ticket.schema";
 import type { TicketStatus } from "@/shared/constants/ticket";
+
+const replyFieldId = "reply-body";
+const replyErrorId = `${replyFieldId}-error`;
 
 export function ReplyForm({ ticketId, status }: { ticketId: string; status: TicketStatus }) {
   const reply = useReplyToTicket(ticketId);
@@ -36,44 +41,48 @@ export function ReplyForm({ ticketId, status }: { ticketId: string; status: Tick
     );
   }
 
-  const onSubmit = handleSubmit(async ({ body }) => {
+  const isResolved = status === "RESOLVED";
+
+  const handleReply = handleSubmit(async ({ body }) => {
     try {
       await reply.mutateAsync(body);
       reset({ body: "" });
-      toast.success(status === "RESOLVED" ? "Reply sent, ticket reopened" : uiMessages.tickets.replySent);
+      toast.success(isResolved ? replyCopy.sentAndReopened : uiMessages.tickets.replySent);
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
   });
 
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleReply();
+  };
+
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-2">
-      <Label htmlFor="reply-body">Add a reply</Label>
-      {status === "RESOLVED" && (
+    <form onSubmit={handleReply} noValidate className="space-y-2">
+      <Label htmlFor={replyFieldId}>Add a reply</Label>
+      {isResolved && (
         <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           {uiMessages.tickets.resolvedReply}
         </p>
       )}
       <Textarea
-        id="reply-body"
+        id={replyFieldId}
         rows={4}
         maxLength={messageMax}
-        placeholder="Write a follow-up or answer a question from our team…"
+        placeholder={replyCopy.placeholder}
         aria-invalid={!!errors.body || undefined}
-        aria-describedby={errors.body ? "reply-body-error" : undefined}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void onSubmit();
-        }}
+        aria-describedby={errors.body ? replyErrorId : undefined}
+        onKeyDown={handleKeyDown}
         {...register("body")}
       />
       {errors.body && (
-        <p id="reply-body-error" role="alert" className="text-xs text-destructive">
+        <p id={replyErrorId} role="alert" className="text-xs text-destructive">
           {errors.body.message}
         </p>
       )}
       <div className="flex items-center justify-between gap-2">
-        <span className="hidden text-xs text-muted-foreground sm:inline">Ctrl/⌘ + Enter to send</span>
+        <span className="hidden text-xs text-muted-foreground sm:inline">{replyCopy.shortcutHint}</span>
         <Button type="submit" disabled={reply.isPending} className="ml-auto">
           {reply.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
           {reply.isPending ? "Sending…" : "Send reply"}

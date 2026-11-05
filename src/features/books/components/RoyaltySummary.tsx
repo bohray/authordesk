@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { toneText } from "@/components/common/tones";
 import { formatDate, formatINR, formatNumber, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { summaryCardClass } from "@/features/books/components/layout";
+import { summaryCardClass } from "@/constants/books";
 import { getPayoutSummary } from "@/features/books/utils/royalty";
 import type { MyBooksDTO } from "@/shared/types/dto";
 
@@ -34,14 +34,14 @@ function StatCard({ label, value, icon: Icon, footer, className }: StatCardProps
 export function RoyaltySummary({ data }: { data: MyBooksDTO }) {
   const { totals, books } = data;
   const payout = getPayoutSummary(data);
-  const live = books.filter((b) => b.isPublished).length;
+  const liveCount = books.filter((b) => b.isPublished).length;
 
   const cards: StatCardProps[] = [
     {
       label: "Copies sold",
       value: formatNumber(totals.copiesSold),
       icon: BookCopy,
-      footer: `${live} of ${plural(books.length, "book")} live`,
+      footer: `${liveCount} of ${plural(books.length, "book")} live`,
     },
     { label: "Royalty earned", value: formatINR(totals.earned), icon: IndianRupee, footer: "Lifetime" },
     { label: "Paid to you", value: formatINR(totals.paid), icon: CheckCircle2, footer: "Lifetime" },
@@ -57,7 +57,14 @@ export function RoyaltySummary({ data }: { data: MyBooksDTO }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       {cards.map((card, i) => (
-        <StatCard key={card.label} {...card} className={summaryCardClass(i)} />
+        <StatCard
+          key={card.label}
+          label={card.label}
+          value={card.value}
+          icon={card.icon}
+          footer={card.footer}
+          className={summaryCardClass(i)}
+        />
       ))}
     </div>
   );

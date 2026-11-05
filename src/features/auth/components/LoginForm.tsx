@@ -17,14 +17,14 @@ import { useLogin } from "@/features/auth/hooks/useAuthMutations";
 import { getErrorMessage, getFieldErrors } from "@/lib/apiClient";
 import { homeForRole } from "@/constants/routes";
 import { uiMessages } from "@/constants/messages";
+import { authMessages, loginFields, portalPathPrefixes, type DemoAccount } from "@/constants/auth";
 import { loginSchema, type LoginInput } from "@/shared/schemas/auth.schema";
 import type { Role } from "@/shared/constants/roles";
 
 /** Only follow same-origin `next` paths that belong to the signed-in role's portal. */
 function safeNext(next: string | null, role: Role): string | null {
   if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
-  const prefix = role === "ADMIN" ? "/admin" : "/author";
-  return next.startsWith(prefix) ? next : null;
+  return next.startsWith(portalPathPrefixes[role]) ? next : null;
 }
 
 export function LoginForm() {
@@ -44,7 +44,7 @@ export function LoginForm() {
     defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = handleSubmit(async (values) => {
+  const handleLogin = handleSubmit(async (values) => {
     setServerError(null);
     try {
       const user = await login.mutateAsync(values);
@@ -52,13 +52,22 @@ export function LoginForm() {
       // Full navigation so the proxy sees the freshly set session cookie.
       window.location.assign(target);
     } catch (err) {
-      const fields = getFieldErrors(err);
-      if (fields.email) setError("email", { message: fields.email });
-      if (fields.password) setError("password", { message: fields.password });
+      const fieldErrors = getFieldErrors(err);
+      for (const { name } of loginFields) {
+        const message = fieldErrors[name];
+        if (message) setError(name, { message });
+      }
       setServerError(getErrorMessage(err));
     }
   });
 
+  const handleDemoPick = (account: DemoAccount) => {
+    setServerError(null);
+    setValue("email", account.email, { shouldValidate: true });
+    setValue("password", account.password, { shouldValidate: true });
+  };
+
+  // Stay disabled after success too: the full-page navigation is still in flight.
   const submitting = login.isPending || login.isSuccess;
   const email = useWatch({ control, name: "email" });
 
@@ -73,49 +82,37 @@ export function LoginForm() {
           <CardDescription>{uiMessages.login.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <form onSubmit={onSubmit} className="space-y-4" noValidate>
+          <form onSubmit={handleLogin} className="space-y-4" noValidate>
             {serverError && (
               <Alert variant="destructive" className="bg-destructive/5">
                 <AlertCircle aria-hidden />
-                <AlertTitle>Couldn&apos;t sign you in</AlertTitle>
+                <AlertTitle>{authMessages.signInFailedTitle}</AlertTitle>
                 <AlertDescription>{serverError}</AlertDescription>
               </Alert>
             )}
-            <FormField id="email" label="Email" error={errors.email?.message}>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                aria-invalid={!!errors.email || undefined}
-                aria-describedby={describedBy("email", { error: errors.email?.message })}
-                {...register("email")}
-              />
-            </FormField>
-            <FormField id="password" label="Password" error={errors.password?.message}>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                aria-invalid={!!errors.password || undefined}
-                aria-describedby={describedBy("password", { error: errors.password?.message })}
-                {...register("password")}
-              />
-            </FormField>
+            {loginFields.map((field) => {
+              const error = errors[field.name]?.message;
+              return (
+                <FormField key={field.name} id={field.name} label={field.label} error={error}>
+                  <Input
+                    id={field.name}
+                    type={field.type}
+                    autoComplete={field.autoComplete}
+                    placeholder={field.placeholder}
+                    aria-invalid={!!error || undefined}
+                    aria-describedby={describedBy(field.name, { error })}
+                    {...register(field.name)}
+                  />
+                </FormField>
+              );
+            })}
             <Button type="submit" className="h-9 w-full" disabled={submitting}>
               {submitting && <Loader2 className="animate-spin" aria-hidden />}
               {submitting ? "Signing in…" : "Sign in"}
             </Button>
           </form>
           <Separator />
-          <DemoAccounts
-            selectedEmail={email}
-            onPick={(a) => {
-              setServerError(null);
-              setValue("email", a.email, { shouldValidate: true });
-              setValue("password", a.password, { shouldValidate: true });
-            }}
-          />
+          <DemoAccounts selectedEmail={email} onPick={handleDemoPick} />
         </CardContent>
       </Card>
     </div>

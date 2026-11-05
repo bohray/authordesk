@@ -1,10 +1,14 @@
-import { Sparkles, ListFilter, UserPen } from "lucide-react";
+import { ListFilter, Sparkles, UserPen, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { sourceBadgeClasses, sourceDescriptions, sourceLabels } from "@/constants/ui";
 import type { ClassificationSource } from "@/shared/constants/ticket";
 
-const icons = { AI: Sparkles, RULE: ListFilter, ADMIN: UserPen } as const;
+const sourceIcons = {
+  AI: Sparkles,
+  RULE: ListFilter,
+  ADMIN: UserPen,
+} satisfies Record<ClassificationSource, LucideIcon>;
 
 /** Small marker showing where a classification value came from: AI, keyword rule or admin edit. */
 export function AiSourceBadge({
@@ -15,7 +19,7 @@ export function AiSourceBadge({
   className?: string;
 }) {
   if (!source) return null;
-  const Icon = icons[source];
+  const Icon = sourceIcons[source];
   return (
     <Badge
       variant="outline"
