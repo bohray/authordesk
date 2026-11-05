@@ -60,5 +60,8 @@
     "mongodb-memory-server@11.3.0": true,
     "@google/genai": false,
     "protobufjs": false
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

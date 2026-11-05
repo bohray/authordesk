@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Test-only values; real secrets live in Vercel project settings, never in the repo.
+      JWT_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
+      MONGODB_URI: mongodb://127.0.0.1:1/unused-tests-use-in-memory-mongo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test (in-memory MongoDB, no AI keys, so fallback paths are exercised)
+        run: npm test
+      - name: Build
+        run: npm run build
