@@ -80,6 +80,13 @@ export const adminTicketQuerySchema = z.object({
 });
 export type AdminTicketQuery = z.infer<typeof adminTicketQuerySchema>;
 
+/** Author "My tickets" pagination (newest first; authors rarely have many tickets). */
+export const authorTicketQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export type AuthorTicketQuery = z.infer<typeof authorTicketQuerySchema>;
+
 export const updatesQuerySchema = z.object({
   since: z.iso.datetime({ offset: true }),
 });

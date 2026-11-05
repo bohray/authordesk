@@ -3,7 +3,9 @@ import mongoose from "mongoose";
 import { AiUsageLog } from "@/server/db/models";
 import { logger } from "@/server/lib/logger";
 
-export type AiOperation = "CLASSIFY" | "DRAFT";
+import type { AiOperation } from "@/shared/constants/ai";
+
+export type { AiOperation };
 
 export interface UsageEntry {
   operation: AiOperation;

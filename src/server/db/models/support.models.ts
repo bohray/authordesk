@@ -1,4 +1,5 @@
 import "server-only";
+import { aiOperations } from "@/shared/constants/ai";
 import { Schema, model, models, type InferSchemaType, type Model, type Types } from "mongoose";
 import { ticketEventTypes } from "@/shared/constants/ticket";
 import { secondsPerDay } from "../../lib/time";
@@ -72,7 +73,7 @@ export const TicketEvent: Model<InferSchemaType<typeof ticketEventSchema>> =
 /* ------------------------------------------------------------------ */
 const aiUsageLogSchema = new Schema(
   {
-    operation: { type: String, enum: ["CLASSIFY", "DRAFT"], required: true },
+    operation: { type: String, enum: aiOperations, required: true },
     provider: { type: String, required: true },
     model: { type: String, required: true },
     ticketId: { type: Schema.Types.ObjectId, ref: "Ticket", default: null },

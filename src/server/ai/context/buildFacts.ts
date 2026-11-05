@@ -1,3 +1,4 @@
+import { publishedBookStatus } from "@/shared/constants/book";
 import { msPerDay, msPerHour } from "@/server/lib/time";
 import { payoutThresholdInr, allPlatforms, type PublisherNames } from "../knowledge-base/publisher";
 
@@ -29,7 +30,7 @@ export const productionStages = [
   "Published & Live",
 ] as const;
 type ProductionStage = (typeof productionStages)[number];
-const publishedStage: ProductionStage = "Published & Live";
+const publishedStage: ProductionStage = publishedBookStatus;
 
 const stageDelayNotes: Partial<Record<ProductionStage, string>> = {
   "Cover Design": "Cover Design is a common delay point: it usually waits on the author's approval of the cover.",

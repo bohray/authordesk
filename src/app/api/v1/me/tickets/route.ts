@@ -1,6 +1,6 @@
 import { withApi } from "@/server/http/withApi";
 import { created, paginated } from "@/server/http/responses";
-import { authorTicketQuerySchema } from "@/server/services/schemas";
+import { authorTicketQuerySchema } from "@/shared/schemas/ticket.schema";
 import { createMyTicket, listMyTickets } from "@/server/services/ticket.service";
 import { createTicketSchema } from "@/shared/schemas/ticket.schema";
 

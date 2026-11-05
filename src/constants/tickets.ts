@@ -3,7 +3,6 @@
  * Status values come from `@/shared/constants/ticket`.
  */
 import type { TicketStatus } from "@/shared/constants/ticket";
-import type { AuthorTicketTab } from "@/types/queue";
 
 export const authorTicketTabLabels = {
   all: "All",
@@ -12,7 +11,8 @@ export const authorTicketTabLabels = {
 } as const satisfies Record<AuthorTicketTab, string>;
 
 /** Tabs in display order. */
-export const authorTicketTabs: readonly AuthorTicketTab[] = ["all", "open", "resolved"];
+export const authorTicketTabs = ["all", "open", "resolved"] as const;
+export type AuthorTicketTab = (typeof authorTicketTabs)[number];
 
 /** Narrows a Tabs `onValueChange` value without a cast. */
 export function isAuthorTicketTab(value: unknown): value is AuthorTicketTab {

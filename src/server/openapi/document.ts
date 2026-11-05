@@ -10,6 +10,7 @@ import { sessionCookie } from "@/shared/constants/roles";
 import { loginSchema } from "@/shared/schemas/auth.schema";
 import {
   adminTicketQuerySchema,
+  authorTicketQuerySchema,
   createMessageSchema,
   createNoteSchema,
   createTicketSchema,
@@ -19,7 +20,6 @@ import {
 } from "@/shared/schemas/ticket.schema";
 import { loginMaxFailures, loginWindowMs } from "../lib/rateLimit";
 import { msPerMinute } from "../lib/time";
-import { authorTicketQuerySchema } from "../services/schemas";
 import * as responseSchemas from "./responseSchemas";
 
 /**

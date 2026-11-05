@@ -9,6 +9,7 @@ import {
   ticketPriorities,
   ticketStatuses,
 } from "@/shared/constants/ticket";
+import { errorCodes } from "@/shared/types/dto";
 import type {
   AdminStatsDTO,
   AdminTicketDetailDTO,
@@ -37,17 +38,7 @@ const id = z.string().meta({ example: "665f1c2e8b3e4a0012345678" });
 
 export const ErrorBodySchema = z.object({
   error: z.object({
-    code: z.enum([
-      "BAD_REQUEST",
-      "VALIDATION_ERROR",
-      "UNAUTHENTICATED",
-      "FORBIDDEN",
-      "NOT_FOUND",
-      "CONFLICT",
-      "RATE_LIMITED",
-      "AI_UNAVAILABLE",
-      "INTERNAL_ERROR",
-    ]),
+    code: z.enum(errorCodes),
     message: z.string(),
     details: z.unknown().optional(),
   }),

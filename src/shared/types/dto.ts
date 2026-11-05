@@ -24,16 +24,19 @@ export interface Paginated<T> {
 export interface ApiErrorBody {
   error: { code: ErrorCode; message: string; details?: unknown };
 }
-export type ErrorCode =
-  | "BAD_REQUEST"
-  | "VALIDATION_ERROR"
-  | "UNAUTHENTICATED"
-  | "FORBIDDEN"
-  | "NOT_FOUND"
-  | "CONFLICT"
-  | "RATE_LIMITED"
-  | "AI_UNAVAILABLE"
-  | "INTERNAL_ERROR";
+/** Every machine-readable error code the API can return (also drives the OpenAPI enum). */
+export const errorCodes = [
+  "BAD_REQUEST",
+  "VALIDATION_ERROR",
+  "UNAUTHENTICATED",
+  "FORBIDDEN",
+  "NOT_FOUND",
+  "CONFLICT",
+  "RATE_LIMITED",
+  "AI_UNAVAILABLE",
+  "INTERNAL_ERROR",
+] as const;
+export type ErrorCode = (typeof errorCodes)[number];
 
 // ---------- auth ----------
 export interface SessionUserDTO {

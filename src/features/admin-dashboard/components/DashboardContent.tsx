@@ -48,7 +48,8 @@ function SummaryMetrics({ data, now }: { data: AdminStatsDTO; now: number }) {
   const oldestHours = oldestOpenAt ? hoursSince(oldestOpenAt, now) : 0;
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    // <dl> so each Metric's <dt>/<dd> pair is a valid, screen-reader-friendly term/value list.
+    <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Metric label="Open tickets" value={formatNumber(openTotal)} hint="Open + In progress" />
       <Metric
         label="Unassigned"
@@ -68,7 +69,7 @@ function SummaryMetrics({ data, now }: { data: AdminStatsDTO; now: number }) {
         tone={toneIf(critical > 0, toneText.danger)}
         hint="Handle these first"
       />
-    </div>
+    </dl>
   );
 }
 

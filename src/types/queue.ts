@@ -23,5 +23,5 @@ export interface AdminQueueQuery {
   page: number;
 }
 
-/** Author ticket list tab. */
-export type AuthorTicketTab = "all" | "open" | "resolved";
+/** Author ticket list tab (values defined once in constants/tickets). */
+export type { AuthorTicketTab } from "@/constants/tickets";
