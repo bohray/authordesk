@@ -1,9 +1,12 @@
 import "server-only";
 import { env } from "@/server/config/env";
+import { msPerSecond } from "@/server/lib/time";
 import {
   LLMError,
   errorFromStatus,
+  errorText,
   isAbortError,
+  providerErrorMaxChars,
   type LLMProvider,
   type LLMRequest,
   type LLMResponse,
@@ -20,8 +23,8 @@ interface GroqChatResponse {
 
 function parseRetryAfter(header: string | null): number | null {
   if (!header) return null;
-  const secs = Number(header);
-  return Number.isFinite(secs) ? Math.round(secs * 1000) : null;
+  const seconds = Number(header);
+  return Number.isFinite(seconds) ? Math.round(seconds * msPerSecond) : null;
 }
 
 /**
@@ -67,7 +70,7 @@ export class GroqProvider implements LLMProvider {
       });
     } catch (e) {
       if (isAbortError(e)) throw new LLMError("TIMEOUT", "Groq request timed out", { provider: this.name });
-      throw new LLMError("UNAVAILABLE", `Groq network error: ${String((e as Error)?.message ?? e).slice(0, 160)}`, {
+      throw new LLMError("UNAVAILABLE", `Groq network error: ${errorText(e)}`, {
         provider: this.name,
       });
     }
@@ -77,7 +80,7 @@ export class GroqProvider implements LLMProvider {
       throw errorFromStatus(
         this.name,
         res.status,
-        `Groq HTTP ${res.status}: ${body.slice(0, 160)}`,
+        `Groq HTTP ${res.status}: ${body.slice(0, providerErrorMaxChars)}`,
         parseRetryAfter(res.headers.get("retry-after")),
       );
     }

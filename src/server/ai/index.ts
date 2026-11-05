@@ -14,7 +14,7 @@ import "server-only";
  */
 import type { DraftDTO } from "@/shared/types/dto";
 import { classifyTicketImpl } from "./classifier.service";
-import { getDraftForTicketImpl } from "./drafter.service";
+import { getDraftForTicketImpl, unavailableDraft } from "./drafter.service";
 import { hasConfiguredProvider } from "./llmClient";
 
 /**
@@ -41,14 +41,7 @@ export async function getDraftForTicket(
   try {
     return await getDraftForTicketImpl(ticketId, opts);
   } catch {
-    return {
-      content: null,
-      status: "UNAVAILABLE",
-      model: null,
-      generatedAt: null,
-      cached: false,
-      message: "AI drafting is temporarily unavailable. Please write a reply manually.",
-    };
+    return unavailableDraft();
   }
 }
 

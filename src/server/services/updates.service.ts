@@ -3,6 +3,7 @@ import type { UpdatesDTO } from "@/shared/types/dto";
 import type { Session } from "../auth/session";
 import { findTicketsUpdatedSince } from "../repositories/ticket.repository";
 
+/** Page size of one poll; a busier window is drained over the following polls. */
 const maxChanges = 100;
 
 /**
@@ -25,6 +26,6 @@ export async function getUpdates(session: Session, since: Date): Promise<Updates
     rows.length === maxChanges ? new Date(rows[rows.length - 1].updatedAt.getTime() - 1) : serverTime;
   return {
     serverTime: cursor.toISOString(),
-    changed: rows.map((r) => ({ id: r._id.toString(), updatedAt: r.updatedAt.toISOString() })),
+    changed: rows.map((row) => ({ id: row._id.toString(), updatedAt: row.updatedAt.toISOString() })),
   };
 }

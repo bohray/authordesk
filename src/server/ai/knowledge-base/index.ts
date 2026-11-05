@@ -18,11 +18,11 @@ export interface CategoryKnowledge {
  * small, embeddings/vector search would add cost, latency and failure modes for no recall
  * gain; the category (already computed) is the best possible retrieval key.
  */
-export function knowledgeForCategory(category: TicketCategory, p: PublisherNames): CategoryKnowledge {
-  const all = kbSections(p);
+export function knowledgeForCategory(category: TicketCategory, publisher: PublisherNames): CategoryKnowledge {
+  const all = kbSections(publisher);
   return {
     overview: all.OVERVIEW_BRIEF,
-    sections: categoryKbSections[category].map((k) => all[k]),
+    sections: categoryKbSections[category].map((key) => all[key]),
     guidance: responseGuidance[category].slice(0, 2),
   };
 }

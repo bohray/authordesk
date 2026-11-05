@@ -43,51 +43,77 @@ import {
   findUsersByIds,
   findUsersWithProfileByIds,
 } from "../repositories/user.repository";
+import { msPerDay, msPerMinute } from "../lib/time";
 import { runAfterResponse } from "./background";
+import { eventActor, newMessage } from "./ticketActivity";
 
-const dayMs = 24 * 60 * 60 * 1000;
 /** A PENDING classification older than this is assumed lost (e.g. the function was killed). */
-const staleClassificationMs = 2 * 60 * 1000;
+const staleClassificationMs = 2 * msPerMinute;
+const invalidAssigneeMessage = "Assignee must be an existing admin";
 
-const isUnresolved = (s: TicketStatus) => unresolvedStatuses.includes(s);
+const isUnresolved = (status: TicketStatus) => unresolvedStatuses.includes(status);
+
+/** Index records by their id string, for O(1) lookups while mapping. */
+function indexById<T extends { _id: Types.ObjectId }>(records: T[]): Map<string, T> {
+  return new Map(records.map((record) => [record._id.toString(), record]));
+}
+
+/** Throws 404 unless the ticket exists. Cheaper than loading the whole document. */
+async function assertTicketExists(ticketId: string): Promise<void> {
+  if (!(await ticketExists(ticketId))) throw Errors.notFound("Ticket");
+}
+
+async function loadTicket(ticketId: string): Promise<TicketRecord> {
+  const ticket = await findTicketById(ticketId);
+  if (!ticket) throw Errors.notFound("Ticket");
+  return ticket;
+}
 
 // ---------------------------------------------------------------------------
 // Queue
 // ---------------------------------------------------------------------------
 
+/** Maps the API's assignee filter to a repository criterion: undefined = any, null = unassigned. */
+function assigneeCriterion(
+  assignee: AdminTicketQuery["assignee"],
+  session: Session,
+): string | null | undefined {
+  if (assignee === "me") return session.userId;
+  if (assignee === "unassigned") return null;
+  return assignee;
+}
+
+/** Start of a calendar day (YYYY-MM-DD) in UTC. */
+const startOfUtcDay = (day: string) => new Date(`${day}T00:00:00.000Z`);
+
 export async function listQueue(
   session: Session,
-  q: AdminTicketQuery,
+  query: AdminTicketQuery,
 ): Promise<{ items: AdminTicketListItemDTO[]; total: number }> {
   const { items, total } = await queryAdminQueue({
-    statuses: q.status,
-    categories: q.category,
-    priorities: q.priority,
-    assigneeId:
-      q.assignee === undefined
-        ? undefined
-        : q.assignee === "me"
-          ? session.userId
-          : q.assignee === "unassigned"
-            ? null
-            : q.assignee,
-    createdFrom: q.from ? new Date(`${q.from}T00:00:00.000Z`) : undefined,
+    statuses: query.status,
+    categories: query.category,
+    priorities: query.priority,
+    assigneeId: assigneeCriterion(query.assignee, session),
+    createdFrom: query.from ? startOfUtcDay(query.from) : undefined,
     // `to` is a calendar day and is inclusive, so the bound is the start of the next day.
-    createdBefore: q.to ? new Date(Date.parse(`${q.to}T00:00:00.000Z`) + dayMs) : undefined,
-    search: q.q || undefined,
-    sort: q.sort,
-    skip: (q.page - 1) * q.limit,
-    limit: q.limit,
+    createdBefore: query.to
+      ? new Date(startOfUtcDay(query.to).getTime() + msPerDay)
+      : undefined,
+    search: query.q || undefined,
+    sort: query.sort,
+    skip: (query.page - 1) * query.limit,
+    limit: query.limit,
   });
 
   // One batched user lookup for every author and assignee on the page (no N+1).
-  const ids = new Set<string>();
-  for (const t of items) {
-    ids.add(t.authorId.toString());
-    if (t.assigneeId) ids.add(t.assigneeId.toString());
+  const userIds = new Set<string>();
+  for (const ticket of items) {
+    userIds.add(ticket.authorId.toString());
+    if (ticket.assigneeId) userIds.add(ticket.assigneeId.toString());
   }
-  const users = new Map((await findUsersByIds([...ids])).map((u) => [u._id.toString(), u]));
-  return { items: items.map((t) => toAdminListItemDTO(t, users)), total };
+  const users = indexById(await findUsersByIds([...userIds]));
+  return { items: items.map((ticket) => toAdminListItemDTO(ticket, users)), total };
 }
 
 // ---------------------------------------------------------------------------
@@ -103,20 +129,21 @@ async function buildDetail(ticket: TicketRecord): Promise<AdminTicketDetailDTO> 
     listNotesForTicket(ticket._id),
     listEventsForTicket(ticket._id),
   ]);
-  const byId = new Map(users.map((u) => [u._id.toString(), u]));
+  const usersById = indexById(users);
   return toAdminTicketDetailDTO(ticket, {
-    author: byId.get(ticket.authorId.toString()) ?? null,
-    assignee: ticket.assigneeId ? (byId.get(ticket.assigneeId.toString()) ?? null) : null,
+    author: usersById.get(ticket.authorId.toString()) ?? null,
+    assignee: ticket.assigneeId ? (usersById.get(ticket.assigneeId.toString()) ?? null) : null,
     book: book ? toBookDTO(book) : null,
     notes,
     events,
   });
 }
 
-async function loadTicket(ticketId: string) {
-  const ticket = await findTicketById(ticketId);
-  if (!ticket) throw Errors.notFound("Ticket");
-  return ticket;
+/** True when classification was started but has shown no sign of life for a while. */
+function hasStaleClassification(ticket: TicketRecord): boolean {
+  if (ticket.ai?.status !== "PENDING") return false;
+  const lastTry = ticket.ai.lastAttemptAt ?? ticket.createdAt;
+  return Date.now() - new Date(lastTry).getTime() > staleClassificationMs;
 }
 
 export async function getTicketDetail(ticketId: string): Promise<AdminTicketDetailDTO> {
@@ -124,8 +151,7 @@ export async function getTicketDetail(ticketId: string): Promise<AdminTicketDeta
 
   // Self-healing: classification normally runs in `after()` on creation, but a serverless
   // invocation can die before it finishes. Opening the ticket retries it in the background.
-  const lastTry = ticket.ai?.lastAttemptAt ?? ticket.createdAt;
-  if (ticket.ai?.status === "PENDING" && Date.now() - new Date(lastTry).getTime() > staleClassificationMs) {
+  if (hasStaleClassification(ticket)) {
     runAfterResponse("classifyTicket:self-heal", () => classifyTicket(ticketId));
   }
   return buildDetail(ticket);
@@ -141,6 +167,73 @@ function resolvedAtFor(ticket: TicketRecord, next: TicketStatus) {
   return ticket.resolvedAt ?? new Date();
 }
 
+/** A pending ticket write: the `$set` fields plus the timeline events that explain them. */
+interface TicketChanges {
+  set: Record<string, unknown>;
+  events: NewTicketEvent[];
+}
+
+type AddEvent = (type: NewTicketEvent["type"], from: string | null, to: string | null) => void;
+
+/**
+ * Status and classification overrides. Source ADMIN marks a human override, which the AI
+ * layer never overwrites later.
+ */
+function applyFieldChanges(
+  ticket: TicketRecord,
+  input: UpdateTicketInput,
+  set: Record<string, unknown>,
+  addEvent: AddEvent,
+) {
+  if (input.status !== undefined && input.status !== ticket.status) {
+    set.status = input.status;
+    set.resolvedAt = resolvedAtFor(ticket, input.status);
+    addEvent("STATUS_CHANGED", ticket.status, input.status);
+  }
+
+  if (input.category !== undefined && input.category !== ticket.category) {
+    set.category = input.category;
+    set.categorySource = "ADMIN";
+    addEvent("CATEGORY_CHANGED", ticket.category, input.category);
+  }
+
+  if (input.priority !== undefined && input.priority !== ticket.priority) {
+    set.priority = input.priority;
+    set.prioritySource = "ADMIN";
+    set.priorityRank = priorityRankByLevel[input.priority];
+    addEvent("PRIORITY_CHANGED", ticket.priority, input.priority);
+  }
+}
+
+/**
+ * Assignment change, if any. Returns the previous and next assignee names (for the timeline)
+ * or null when the assignee stays the same. Rejects an id that isn't an existing admin.
+ */
+async function resolveAssignmentChange(
+  session: Session,
+  ticket: TicketRecord,
+  requested: UpdateTicketInput["assigneeId"],
+): Promise<{ assigneeId: Types.ObjectId | null; fromName: string | null; toName: string | null } | null> {
+  if (requested === undefined) return null;
+  const nextId = requested === "me" ? session.userId : requested;
+  const currentId = ticket.assigneeId?.toString() ?? null;
+  if (nextId === currentId) return null;
+
+  // Both lookups are independent, so run them together instead of back to back.
+  const [nextAdmin, currentUser] = await Promise.all([
+    nextId ? findAdminById(nextId) : Promise.resolve(null),
+    currentId ? findUserById(currentId) : Promise.resolve(null),
+  ]);
+  if (nextId && !nextAdmin) {
+    throw Errors.validation([{ in: "body", path: "assigneeId", message: invalidAssigneeMessage }]);
+  }
+  return {
+    assigneeId: nextId ? new Types.ObjectId(nextId) : null,
+    fromName: currentUser?.name ?? null,
+    toName: nextAdmin?.name ?? null,
+  };
+}
+
 export async function updateTicketAsAdmin(
   session: Session,
   ticketId: string,
@@ -149,48 +242,16 @@ export async function updateTicketAsAdmin(
   const ticket = await loadTicket(ticketId);
   const set: Record<string, unknown> = {};
   const events: NewTicketEvent[] = [];
-  const event = (type: NewTicketEvent["type"], from: string | null, to: string | null) =>
-    events.push({ ticketId: ticket._id, type, actorId: session.userId, actorName: session.name, from, to });
+  const actor = eventActor(session, ticket._id);
+  const addEvent: AddEvent = (type, from, to) => events.push({ ...actor, type, from, to });
 
-  if (input.status !== undefined && input.status !== ticket.status) {
-    set.status = input.status;
-    set.resolvedAt = resolvedAtFor(ticket, input.status);
-    event("STATUS_CHANGED", ticket.status, input.status);
-  }
+  applyFieldChanges(ticket, input, set, addEvent);
 
-  if (input.category !== undefined && input.category !== ticket.category) {
-    // Source ADMIN marks a human override; the AI layer won't overwrite it later.
-    set.category = input.category;
-    set.categorySource = "ADMIN";
-    event("CATEGORY_CHANGED", ticket.category, input.category);
-  }
-
-  if (input.priority !== undefined && input.priority !== ticket.priority) {
-    set.priority = input.priority;
-    set.prioritySource = "ADMIN";
-    set.priorityRank = priorityRankByLevel[input.priority];
-    event("PRIORITY_CHANGED", ticket.priority, input.priority);
-  }
-
-  if (input.assigneeId !== undefined) {
-    const nextId = input.assigneeId === "me" ? session.userId : input.assigneeId;
-    const currentId = ticket.assigneeId?.toString() ?? null;
-    if (nextId !== currentId) {
-      // Both lookups are independent, so run them together instead of back to back.
-      const [admin, current] = await Promise.all([
-        nextId ? findAdminById(nextId) : Promise.resolve(null),
-        currentId ? findUserById(currentId) : Promise.resolve(null),
-      ]);
-      if (nextId && !admin) {
-        throw Errors.validation([
-          { in: "body", path: "assigneeId", message: "Assignee must be an existing admin" },
-        ]);
-      }
-      const nextName = admin?.name ?? null;
-      set.assigneeId = nextId ? new Types.ObjectId(nextId) : null;
-      // Names (not ids) so the timeline reads naturally without extra lookups.
-      event("ASSIGNED", current?.name ?? null, nextName);
-    }
+  const assignment = await resolveAssignmentChange(session, ticket, input.assigneeId);
+  if (assignment) {
+    set.assigneeId = assignment.assigneeId;
+    // Names (not ids) so the timeline reads naturally without extra lookups.
+    addEvent("ASSIGNED", assignment.fromName, assignment.toName);
   }
 
   if (events.length === 0) return buildDetail(ticket); // pure no-op: nothing written
@@ -205,18 +266,11 @@ export async function updateTicketAsAdmin(
 // Reply / notes
 // ---------------------------------------------------------------------------
 
-export async function replyAsAdmin(
-  session: Session,
-  ticketId: string,
-  input: CreateMessageInput,
-): Promise<AdminTicketDetailDTO> {
-  const ticket = await loadTicket(ticketId);
-  if (ticket.status === "CLOSED") throw Errors.ticketClosed();
-
-  const now = new Date();
+/** Side effects of an admin reply: first-response SLA, OPEN → IN_PROGRESS, auto-assignment. */
+function replySideEffects(session: Session, ticket: TicketRecord, now: Date): TicketChanges {
   const set: Record<string, unknown> = {};
   const events: NewTicketEvent[] = [];
-  const actor = { ticketId: ticket._id, actorId: session.userId, actorName: session.name };
+  const actor = eventActor(session, ticket._id);
 
   if (!ticket.firstResponseAt) set.firstResponseAt = now; // SLA metric: first human response
   if (ticket.status === "OPEN") {
@@ -228,24 +282,36 @@ export async function replyAsAdmin(
     set.assigneeId = new Types.ObjectId(session.userId);
     events.push({ ...actor, type: "ASSIGNED", from: null, to: session.name });
   }
-  events.push({ ...actor, type: "REPLIED", to: input.aiAssisted ? "AI_ASSISTED" : null });
+  return { set, events };
+}
+
+export async function replyAsAdmin(
+  session: Session,
+  ticketId: string,
+  input: CreateMessageInput,
+): Promise<AdminTicketDetailDTO> {
+  const ticket = await loadTicket(ticketId);
+  if (ticket.status === "CLOSED") throw Errors.ticketClosed();
+
+  const now = new Date();
+  const { set, events } = replySideEffects(session, ticket, now);
+  events.push({
+    ...eventActor(session, ticket._id),
+    type: "REPLIED",
+    to: input.aiAssisted ? "AI_ASSISTED" : null,
+  });
+  const message = newMessage(session, "ADMIN", input.body, {
+    aiAssisted: input.aiAssisted,
+    createdAt: now,
+  });
 
   const updated = await updateTicket(
     ticket._id,
     {
-      $push: {
-        messages: {
-          _id: new Types.ObjectId(),
-          senderId: new Types.ObjectId(session.userId),
-          senderRole: "ADMIN",
-          senderName: session.name,
-          body: input.body,
-          aiAssisted: input.aiAssisted ?? false,
-          createdAt: now,
-        },
-      },
+      $push: { messages: message },
       ...(Object.keys(set).length ? { $set: set } : {}),
     },
+    // Guard against another admin closing the ticket between our read and this write.
     { status: { $ne: "CLOSED" } },
   );
   if (!updated) throw Errors.ticketClosed();
@@ -258,7 +324,7 @@ export async function addNote(
   ticketId: string,
   input: CreateNoteInput,
 ): Promise<TicketNoteDTO> {
-  if (!(await ticketExists(ticketId))) throw Errors.notFound("Ticket");
+  await assertTicketExists(ticketId);
   const note = await createNote({
     ticketId,
     adminId: session.userId,
@@ -266,9 +332,7 @@ export async function addNote(
     body: input.body,
   });
   await Promise.all([
-    recordEvents([
-      { ticketId, type: "NOTE_ADDED", actorId: session.userId, actorName: session.name },
-    ]),
+    recordEvents([{ ...eventActor(session, ticketId), type: "NOTE_ADDED" }]),
     // Notes live in their own collection; bump the ticket so other admins' polls refresh it.
     touchTicket(ticketId),
   ]);
@@ -280,13 +344,13 @@ export async function addNote(
 // ---------------------------------------------------------------------------
 
 export async function getDraft(ticketId: string, regenerate = false): Promise<DraftDTO> {
-  if (!(await ticketExists(ticketId))) throw Errors.notFound("Ticket");
+  await assertTicketExists(ticketId);
   return getDraftForTicket(ticketId, { regenerate });
 }
 
 export async function retryClassification(ticketId: string): Promise<AdminTicketDetailDTO> {
   // Cheap existence check first; the full document is read once, after classification.
-  if (!(await ticketExists(ticketId))) throw Errors.notFound("Ticket");
+  await assertTicketExists(ticketId);
   await classifyTicket(ticketId); // never throws; failures are recorded on the ticket
   return buildDetail(await loadTicket(ticketId));
 }

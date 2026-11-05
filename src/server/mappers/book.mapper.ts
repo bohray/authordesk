@@ -6,26 +6,26 @@ import { iso } from "./common";
 /** The dataset's status string for a book that is on sale. */
 export const publishedStatus = "Published & Live";
 
-export function toBookDTO(b: BookRecord): BookDTO {
+export function toBookDTO(book: BookRecord): BookDTO {
   return {
-    id: b._id.toString(),
-    code: b.code,
-    title: b.title,
-    isbn: b.isbn,
-    genre: b.genre,
-    publicationDate: iso(b.publicationDate),
-    status: b.status,
-    isPublished: b.status === publishedStatus,
-    mrp: b.mrp ?? null,
-    royaltyPerCopy: b.royaltyPerCopy ?? null,
-    copiesSold: b.copiesSold ?? 0,
+    id: book._id.toString(),
+    code: book.code,
+    title: book.title,
+    isbn: book.isbn,
+    genre: book.genre,
+    publicationDate: iso(book.publicationDate),
+    status: book.status,
+    isPublished: book.status === publishedStatus,
+    mrp: book.mrp ?? null,
+    royaltyPerCopy: book.royaltyPerCopy ?? null,
+    copiesSold: book.copiesSold ?? 0,
     royalty: {
-      earned: b.royalty?.earned ?? 0,
-      paid: b.royalty?.paid ?? 0,
-      pending: b.royalty?.pending ?? 0,
-      lastPayoutDate: iso(b.royalty?.lastPayoutDate),
+      earned: book.royalty?.earned ?? 0,
+      paid: book.royalty?.paid ?? 0,
+      pending: book.royalty?.pending ?? 0,
+      lastPayoutDate: iso(book.royalty?.lastPayoutDate),
     },
-    printPartner: b.printPartner ?? null,
-    availableOn: b.availableOn ?? [],
+    printPartner: book.printPartner ?? null,
+    availableOn: book.availableOn ?? [],
   };
 }

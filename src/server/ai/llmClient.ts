@@ -3,7 +3,14 @@ import { env } from "@/server/config/env";
 import { logger } from "@/server/lib/logger";
 import { GeminiProvider } from "./providers/gemini.provider";
 import { GroqProvider } from "./providers/groq.provider";
-import { LLMError, isLLMError, type LLMProvider, type LLMRequest, type ModelTier } from "./providers/llmProvider";
+import {
+  LLMError,
+  errorText,
+  isLLMError,
+  type LLMProvider,
+  type LLMRequest,
+  type ModelTier,
+} from "./providers/llmProvider";
 import { logUsage, type AiOperation } from "./usageLogger";
 
 /* ------------------------------------------------------------------ */
@@ -12,6 +19,8 @@ import { logUsage, type AiOperation } from "./usageLogger";
 /** Retries on the SAME provider for transient errors (so up to 3 attempts per provider). */
 const maxRetries = 2;
 const baseBackoffMs = 400;
+/** Random extra wait of up to this share of the backoff, so concurrent retries de-synchronise. */
+const backoffJitterRatio = 0.5;
 /**
  * Longest server-requested wait we honour. If a provider says "retry in 30s" we do not
  * sit on a serverless invocation; we fall through to the next provider instead.
@@ -19,6 +28,8 @@ const baseBackoffMs = 400;
 const maxRetryAfterMs = 4_000;
 const breakerThreshold = 3;
 const breakerCooldownMs = 60_000;
+/** Parser error detail kept in a BAD_RESPONSE message. */
+const parseErrorMaxChars = 120;
 
 /* ------------------------------------------------------------------ */
 /* Dependency injection (tests)                                       */
@@ -50,19 +61,21 @@ function providers(): LLMProvider[] {
   defaultProviders ??= [new GeminiProvider(), new GroqProvider()];
   return defaultProviders;
 }
-const sleep = (ms: number) => (overrides.sleep ?? ((t: number) => new Promise((r) => setTimeout(r, t))))(ms);
+const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => (overrides.sleep ?? realSleep)(ms);
 const now = () => (overrides.now ?? Date.now)();
 
 export function hasConfiguredProvider(): boolean {
-  return providers().some((p) => p.isConfigured());
+  return providers().some((provider) => provider.isConfigured());
 }
 
 /* ------------------------------------------------------------------ */
 /* Circuit breaker (per provider, per server instance)                */
 /* ------------------------------------------------------------------ */
 /**
- * Why: when a free tier is exhausted every call fails slowly. After 3 consecutive failures we
- * stop calling that provider for 60s (go straight to the fallback / rule engine), then let a
+ * Why: when a free tier is exhausted every call fails slowly. After `breakerThreshold`
+ * consecutive failures we stop calling that provider for `breakerCooldownMs` (go straight to
+ * the fallback / rule engine), then let a
  * single "half-open" probe through. A success closes the circuit; a failure re-opens it.
  */
 interface BreakerState {
@@ -72,13 +85,15 @@ interface BreakerState {
 }
 const breakers = new Map<string, BreakerState>();
 
+const closedBreaker = (): BreakerState => ({ failures: 0, openUntil: 0, probeInFlight: false });
+
 function breaker(name: string): BreakerState {
-  let b = breakers.get(name);
-  if (!b) {
-    b = { failures: 0, openUntil: 0, probeInFlight: false };
-    breakers.set(name, b);
+  let state = breakers.get(name);
+  if (!state) {
+    state = closedBreaker();
+    breakers.set(name, state);
   }
-  return b;
+  return state;
 }
 
 export function resetCircuitBreakers() {
@@ -87,9 +102,9 @@ export function resetCircuitBreakers() {
 
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 export function getCircuitState(name: string): CircuitState {
-  const b = breaker(name);
-  if (b.failures < breakerThreshold) return "CLOSED";
-  return now() < b.openUntil ? "OPEN" : "HALF_OPEN";
+  const state = breaker(name);
+  if (state.failures < breakerThreshold) return "CLOSED";
+  return now() < state.openUntil ? "OPEN" : "HALF_OPEN";
 }
 
 /** Returns false if the provider must be skipped right now. Claims the probe slot if half-open. */
@@ -97,31 +112,36 @@ function breakerAllows(name: string): boolean {
   const state = getCircuitState(name);
   if (state === "CLOSED") return true;
   if (state === "OPEN") return false;
-  const b = breaker(name);
-  if (b.probeInFlight) return false;
-  b.probeInFlight = true;
+  const probe = breaker(name);
+  if (probe.probeInFlight) return false;
+  probe.probeInFlight = true;
   return true;
 }
 
 function recordSuccess(name: string) {
-  breakers.set(name, { failures: 0, openUntil: 0, probeInFlight: false });
+  breakers.set(name, closedBreaker());
 }
 
 function recordFailure(name: string) {
-  const b = breaker(name);
-  b.failures += 1;
-  b.probeInFlight = false;
-  if (b.failures >= breakerThreshold) {
-    const wasOpen = b.openUntil > 0;
-    b.openUntil = now() + breakerCooldownMs;
-    logger.warn(wasOpen ? "ai.circuit_reopened" : "ai.circuit_opened", { provider: name, failures: b.failures });
+  const state = breaker(name);
+  state.failures += 1;
+  state.probeInFlight = false;
+  if (state.failures >= breakerThreshold) {
+    const wasOpen = state.openUntil > 0;
+    state.openUntil = now() + breakerCooldownMs;
+    logger.warn(wasOpen ? "ai.circuit_reopened" : "ai.circuit_opened", { provider: name, failures: state.failures });
   }
+}
+
+/** A malformed answer says nothing about availability: free the probe slot, keep the count. */
+function releaseProbe(name: string) {
+  breaker(name).probeInFlight = false;
 }
 
 /* ------------------------------------------------------------------ */
 /* Single attempt with a hard timeout                                 */
 /* ------------------------------------------------------------------ */
-async function attemptWithTimeout(provider: LLMProvider, req: Omit<LLMRequest, "signal">) {
+async function attemptWithTimeout(provider: LLMProvider, req: AttemptRequest) {
   const timeoutMs = overrides.timeoutMs ?? env().AI_TIMEOUT_MS;
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -139,11 +159,27 @@ async function attemptWithTimeout(provider: LLMProvider, req: Omit<LLMRequest, "
   }
 }
 
+/** Wait before the next retry, or null when the provider asked for longer than we will wait. */
 function backoffMs(retry: number, err: LLMError): number | null {
   if (err.retryAfterMs != null) return err.retryAfterMs > maxRetryAfterMs ? null : err.retryAfterMs;
-  const exp = baseBackoffMs * 2 ** retry;
-  const jitter = (overrides.random ?? Math.random)() * exp * 0.5; // de-synchronise concurrent retries
-  return Math.round(exp + jitter);
+  const exponential = baseBackoffMs * 2 ** retry;
+  const jitter = (overrides.random ?? Math.random)() * exponential * backoffJitterRatio;
+  return Math.round(exponential + jitter);
+}
+
+function toLLMError(e: unknown, provider: string): LLMError {
+  return isLLMError(e) ? e : new LLMError("UNAVAILABLE", errorText(e), { provider });
+}
+
+function parseOrThrow<T>(parse: (text: string) => T, text: string, provider: string): T {
+  try {
+    return parse(text);
+  } catch (e) {
+    throw new LLMError("BAD_RESPONSE", `Invalid model output: ${errorText(e, parseErrorMaxChars)}`, {
+      provider,
+      retryable: false,
+    });
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -172,17 +208,54 @@ export interface LLMCallResult<T> {
   latencyMs: number;
 }
 
+type AttemptRequest = Omit<LLMRequest, "signal">;
+
+interface AttemptContext<T> {
+  operation: AiOperation;
+  ticketId: string | null;
+  parse: (text: string) => T;
+}
+
+/**
+ * One attempt on one provider: call with timeout, parse, update the breaker on success and
+ * log usage either way. Always throws an LLMError on failure.
+ */
+async function attemptOnce<T>(
+  provider: LLMProvider,
+  req: AttemptRequest,
+  { operation, ticketId, parse }: AttemptContext<T>,
+): Promise<LLMCallResult<T>> {
+  const model = provider.modelFor(req.tier);
+  const started = now();
+  let tokens = { inputTokens: 0, outputTokens: 0 };
+  try {
+    const res = await attemptWithTimeout(provider, req);
+    tokens = { inputTokens: res.inputTokens, outputTokens: res.outputTokens };
+    const value = parseOrThrow(parse, res.text, provider.name);
+    const latencyMs = now() - started;
+    recordSuccess(provider.name);
+    logUsage({ operation, provider: provider.name, model: res.model, ticketId, ...tokens, latencyMs, success: true, errorCode: null });
+    return { value, provider: provider.name, model: res.model, ...tokens, latencyMs };
+  } catch (e) {
+    const err = toLLMError(e, provider.name);
+    // Tokens are still billed for a bad response, so they are logged on failure too.
+    logUsage({ operation, provider: provider.name, model, ticketId, ...tokens, latencyMs: now() - started, success: false, errorCode: err.kind });
+    throw err;
+  }
+}
+
 /**
  * Run one logical LLM call through the fallback chain.
  *  - per attempt: hard timeout (AI_TIMEOUT_MS)
- *  - RATE_LIMIT / UNAVAILABLE: up to 2 retries with exponential backoff + jitter (or retry-after, capped)
+ *  - RATE_LIMIT / UNAVAILABLE: up to `maxRetries` retries with exponential backoff + jitter
+ *    (or retry-after, capped)
  *  - TIMEOUT / BAD_RESPONSE / non-retryable: move straight to the next provider
  *  - every real attempt is written to AiUsageLog (fire-and-forget)
  * Throws an LLMError only when every provider failed or none is configured.
  */
 export async function callLLM<T>(opts: LLMCallOptions<T>): Promise<LLMCallResult<T>> {
-  const { operation, parse, ticketId = null, ...rest } = opts;
-  const req = { ...rest };
+  const { operation, parse, ticketId = null, ...req } = opts;
+  const context: AttemptContext<T> = { operation, ticketId, parse };
   let lastError: LLMError | null = null;
   let anyConfigured = false;
 
@@ -195,36 +268,13 @@ export async function callLLM<T>(opts: LLMCallOptions<T>): Promise<LLMCallResult
         lastError ??= new LLMError("UNAVAILABLE", `${provider.name} circuit open`, { provider: provider.name });
         break;
       }
-      const model = provider.modelFor(req.tier);
-      const started = now();
-      let tokens = { inputTokens: 0, outputTokens: 0 };
       try {
-        const res = await attemptWithTimeout(provider, req);
-        tokens = { inputTokens: res.inputTokens, outputTokens: res.outputTokens };
-        let value: T;
-        try {
-          value = parse(res.text);
-        } catch (e) {
-          throw new LLMError("BAD_RESPONSE", `Invalid model output: ${String((e as Error)?.message ?? e).slice(0, 120)}`, {
-            provider: provider.name,
-            retryable: false,
-          });
-        }
-        const latencyMs = now() - started;
-        recordSuccess(provider.name);
-        logUsage({ operation, provider: provider.name, model: res.model, ticketId, ...tokens, latencyMs, success: true, errorCode: null });
-        return { value, provider: provider.name, model: res.model, ...tokens, latencyMs };
+        return await attemptOnce(provider, req, context);
       } catch (e) {
-        const err = isLLMError(e)
-          ? e
-          : new LLMError("UNAVAILABLE", String((e as Error)?.message ?? e).slice(0, 160), { provider: provider.name });
+        const err = toLLMError(e, provider.name);
         lastError = err;
-        // Tokens are still billed for a bad response, so they are logged on failure too.
-        logUsage({ operation, provider: provider.name, model, ticketId, ...tokens, latencyMs: now() - started, success: false, errorCode: err.kind });
-
-        // A model producing malformed output says nothing about availability: keep the circuit as is.
         if (err.kind === "BAD_RESPONSE") {
-          breaker(provider.name).probeInFlight = false;
+          releaseProbe(provider.name);
           break;
         }
         recordFailure(provider.name);

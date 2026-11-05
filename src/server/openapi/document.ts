@@ -17,8 +17,10 @@ import {
   updateTicketSchema,
   updatesQuerySchema,
 } from "@/shared/schemas/ticket.schema";
+import { loginMaxFailures, loginWindowMs } from "../lib/rateLimit";
+import { msPerMinute } from "../lib/time";
 import { authorTicketQuerySchema } from "../services/schemas";
-import * as R from "./responseSchemas";
+import * as responseSchemas from "./responseSchemas";
 
 /**
  * OpenAPI 3.0 document generated from the same Zod schemas the API validates with,
@@ -32,7 +34,7 @@ const json = (schema: ZodType, description: string): ResponseConfig => ({
   content: { "application/json": { schema } },
 });
 
-function build() {
+function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
 
   registry.registerComponent("securitySchemes", "cookieAuth", {
@@ -43,19 +45,19 @@ function build() {
   });
 
   // Components
-  const ErrorBody = registry.register("ErrorBody", R.ErrorBodySchema);
-  const SessionUser = registry.register("SessionUser", R.SessionUserSchema);
+  const ErrorBody = registry.register("ErrorBody", responseSchemas.ErrorBodySchema);
+  const SessionUser = registry.register("SessionUser", responseSchemas.SessionUserSchema);
   // Registered so nested uses (MyBooks.books, bookDetails) render as a $ref.
-  registry.register("Book", R.BookSchema);
-  const MyBooks = registry.register("MyBooks", R.MyBooksSchema);
-  const AuthorTicket = registry.register("AuthorTicket", R.AuthorTicketSchema);
-  const AdminTicketListItem = registry.register("AdminTicketListItem", R.AdminTicketListItemSchema);
-  const AdminTicketDetail = registry.register("AdminTicketDetail", R.AdminTicketDetailSchema);
-  const TicketNote = registry.register("TicketNote", R.TicketNoteSchema);
-  const Draft = registry.register("Draft", R.DraftSchema);
-  const AdminStats = registry.register("AdminStats", R.AdminStatsSchema);
-  const Updates = registry.register("Updates", R.UpdatesSchema);
-  const Meta = registry.register("PaginationMeta", R.PaginationMetaSchema);
+  registry.register("Book", responseSchemas.BookSchema);
+  const MyBooks = registry.register("MyBooks", responseSchemas.MyBooksSchema);
+  const AuthorTicket = registry.register("AuthorTicket", responseSchemas.AuthorTicketSchema);
+  const AdminTicketListItem = registry.register("AdminTicketListItem", responseSchemas.AdminTicketListItemSchema);
+  const AdminTicketDetail = registry.register("AdminTicketDetail", responseSchemas.AdminTicketDetailSchema);
+  const TicketNote = registry.register("TicketNote", responseSchemas.TicketNoteSchema);
+  const Draft = registry.register("Draft", responseSchemas.DraftSchema);
+  const AdminStats = registry.register("AdminStats", responseSchemas.AdminStatsSchema);
+  const Updates = registry.register("Updates", responseSchemas.UpdatesSchema);
+  const Meta = registry.register("PaginationMeta", responseSchemas.PaginationMetaSchema);
 
   // Shared schemas were built before Zod was extended (see responseSchemas.ts), so they
   // are cloned to gain `.openapi()`. Validation, refinements and transforms are unchanged.
@@ -96,7 +98,9 @@ function build() {
       200: json(data(SessionUser), "Signed in"),
       401: err("Invalid email or password"),
       422: err("Validation error"),
-      429: err("Too many failed attempts (5 per email per 15 minutes)"),
+      429: err(
+        `Too many failed attempts (${loginMaxFailures} per email per ${loginWindowMs / msPerMinute} minutes)`,
+      ),
     },
   });
   route({
@@ -275,10 +279,10 @@ function build() {
   });
 }
 
-type OpenApiDocument = ReturnType<typeof build>;
+type OpenApiDocument = ReturnType<typeof buildOpenApiDocument>;
 let cached: OpenApiDocument | null = null;
 
 /** Built once per server instance: the document only changes when the code does. */
 export function getOpenApiDocument(): OpenApiDocument {
-  return (cached ??= build());
+  return (cached ??= buildOpenApiDocument());
 }

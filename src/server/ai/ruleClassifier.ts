@@ -1,6 +1,7 @@
 import type { TicketCategory, TicketPriority } from "@/shared/constants/ticket";
 import { ticketPriorities } from "@/shared/constants/ticket";
-import type { RoyaltyFacts } from "./context/buildFacts";
+import { formatINR, type RoyaltyFacts } from "./context/buildFacts";
+import { payoutThresholdInr } from "./knowledge-base/publisher";
 
 /**
  * Deterministic fallback classifier. Runs with zero cost and zero dependencies, so the admin
@@ -53,13 +54,95 @@ const notReceived = /(haven'?t|have not|not|never|didn'?t|did not|yet to) (been 
 const neverOrLong = /\bnever\b|\byear\b|\b([4-9]|1\d) months\b|\b(six|seven|eight|nine|ten|twelve) months\b|quarters/i;
 const calcQuestion = /calculat|breakdown|too low|seems low|looks low|only (got|received)|how (is|was) .* (computed|worked out)/i;
 const bioHowto = /\bbio\b|description|blurb|keywords?|how (do|can) i|can i/i;
+const listingBroken = /unavailable|not available|out of stock/i;
 
-function bump(p: TicketPriority): TicketPriority {
-  const i = ticketPriorities.indexOf(p);
-  return ticketPriorities[Math.max(0, i - 1)]; // array is ordered CRITICAL → LOW
+/** Confidence model: a floor for no keyword match, otherwise a base plus a bonus per point of margin. */
+const noMatchConfidence = 0.3;
+const baseConfidence = 0.4;
+const confidencePerMarginPoint = 0.05;
+/** Kept well below typical AI confidence so metrics and the UI can tell rule results apart. */
+const maxRuleConfidence = 0.7;
+const reasoningMaxChars = 300;
+const thresholdText = formatINR(payoutThresholdInr);
+
+interface PriorityDecision {
+  priority: TicketPriority;
+  reason: string;
 }
-const max = (a: TicketPriority, b: TicketPriority) =>
+
+/** Starting priority per category, before facts and urgency adjustments. */
+const basePriorityByCategory: Record<TicketCategory, (text: string) => PriorityDecision> = {
+  ISBN_METADATA: () => ({ priority: "HIGH", reason: "ISBN/metadata error (policy: high priority)" }),
+  PRINTING_QUALITY: () => ({ priority: "HIGH", reason: "print quality defect" }),
+  ROYALTY_PAYMENTS: (text) => {
+    if (notReceived.test(text) && neverOrLong.test(text)) {
+      return { priority: "CRITICAL", reason: "royalty not received for a long period" };
+    }
+    if (notReceived.test(text)) return { priority: "HIGH", reason: "royalty not received" };
+    return {
+      priority: "MEDIUM",
+      reason: calcQuestion.test(text) ? "royalty calculation question" : "royalty question",
+    };
+  },
+  DISTRIBUTION_AVAILABILITY: () => ({ priority: "MEDIUM", reason: "listing availability issue" }),
+  BOOK_STATUS_PRODUCTION: () => ({ priority: "MEDIUM", reason: "production timeline question" }),
+  GENERAL_INQUIRY: () => ({ priority: "LOW", reason: "general / how-to question" }),
+};
+
+/** One level more urgent (the priorities array is ordered CRITICAL → LOW). */
+function raiseOneLevel(priority: TicketPriority): TicketPriority {
+  const index = ticketPriorities.indexOf(priority);
+  return ticketPriorities[Math.max(0, index - 1)];
+}
+const moreUrgent = (a: TicketPriority, b: TicketPriority) =>
   ticketPriorities.indexOf(a) <= ticketPriorities.indexOf(b) ? a : b;
+
+/** Categories ranked by weighted keyword score, best first. */
+function scoreCategories(text: string) {
+  const scores = (Object.entries(categoryPatterns) as [TicketCategory, Pattern[]][]).map(
+    ([category, patterns]) => ({
+      category,
+      score: patterns.reduce((sum, [pattern, weight]) => sum + (pattern.test(text) ? weight : 0), 0),
+    }),
+  );
+  return scores.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Computed facts beat keywords: genuinely overdue money raises priority, below-threshold doesn't.
+ * `settled` means the facts answered the question, so urgency words must not escalate it.
+ */
+function applyRoyaltyFacts(
+  priority: TicketPriority,
+  royalty: RoyaltyFacts,
+): { priority: TicketPriority; reason: string | null; settled: boolean } {
+  if (royalty.longOverdue) {
+    return { priority: "CRITICAL", reason: `book data: ${royalty.missedPayoutRuns} payout runs missed`, settled: false };
+  }
+  if (royalty.status === "OVERDUE") {
+    return { priority: moreUrgent(priority, "HIGH"), reason: "book data: payout overdue", settled: false };
+  }
+  if (royalty.status === "BELOW_THRESHOLD" || royalty.status === "DUE_NEXT_RUN") {
+    // The author may feel it is late, but per policy nothing is overdue: a schedule/policy explanation.
+    return {
+      priority: "MEDIUM",
+      settled: true,
+      reason:
+        royalty.status === "BELOW_THRESHOLD"
+          ? `book data: balance below ${thresholdText} threshold (rolls over, not overdue)`
+          : "book data: not overdue, due in next payout run",
+    };
+  }
+  return { priority, reason: null, settled: false };
+}
+
+function ruleConfidence(bestScore: number, secondScore: number): number {
+  const confidence =
+    bestScore === 0
+      ? noMatchConfidence
+      : Math.min(maxRuleConfidence, baseConfidence + confidencePerMarginPoint * (bestScore - secondScore));
+  return Math.round(confidence * 100) / 100;
+}
 
 export function ruleClassify(
   input: { subject: string; description: string },
@@ -68,75 +151,25 @@ export function ruleClassify(
   const text = `${input.subject}\n${input.description}`;
 
   // 1. Category by weighted keyword score.
-  const scores = (Object.entries(categoryPatterns) as [TicketCategory, Pattern[]][]).map(([cat, pats]) => ({
-    cat,
-    score: pats.reduce((s, [re, w]) => s + (re.test(text) ? w : 0), 0),
-  }));
-  scores.sort((a, b) => b.score - a.score);
-  const [best, second] = scores;
-  let category: TicketCategory = best.score > 0 ? best.cat : "GENERAL_INQUIRY";
+  const [best, second] = scoreCategories(text);
+  let category: TicketCategory = best.score > 0 ? best.category : "GENERAL_INQUIRY";
   // "Update my description on Amazon" is a how-to, not a broken listing.
-  if (category === "DISTRIBUTION_AVAILABILITY" && bioHowto.test(text) && !/unavailable|not available|out of stock/i.test(text)) {
+  if (category === "DISTRIBUTION_AVAILABILITY" && bioHowto.test(text) && !listingBroken.test(text)) {
     category = "GENERAL_INQUIRY";
   }
 
   // 2. Base priority per category + specific signals.
-  const reasons: string[] = [];
-  let priority: TicketPriority;
-  switch (category) {
-    case "ISBN_METADATA":
-      priority = "HIGH";
-      reasons.push("ISBN/metadata error (policy: high priority)");
-      break;
-    case "PRINTING_QUALITY":
-      priority = "HIGH";
-      reasons.push("print quality defect");
-      break;
-    case "ROYALTY_PAYMENTS":
-      if (notReceived.test(text) && neverOrLong.test(text)) {
-        priority = "CRITICAL";
-        reasons.push("royalty not received for a long period");
-      } else if (notReceived.test(text)) {
-        priority = "HIGH";
-        reasons.push("royalty not received");
-      } else {
-        priority = "MEDIUM";
-        reasons.push(calcQuestion.test(text) ? "royalty calculation question" : "royalty question");
-      }
-      break;
-    case "DISTRIBUTION_AVAILABILITY":
-      priority = "MEDIUM";
-      reasons.push("listing availability issue");
-      break;
-    case "BOOK_STATUS_PRODUCTION":
-      priority = "MEDIUM";
-      reasons.push("production timeline question");
-      break;
-    default:
-      priority = "LOW";
-      reasons.push("general / how-to question");
-  }
+  const base = basePriorityByCategory[category](text);
+  let priority = base.priority;
+  const reasons = [base.reason];
 
-  // 3. Computed facts beat keywords: genuinely overdue money raises priority, below-threshold doesn't.
-  const r = context.royalty;
+  // 3. Computed facts (royalty tickets only).
   let factsSettled = false;
-  if (category === "ROYALTY_PAYMENTS" && r) {
-    if (r.longOverdue) {
-      priority = "CRITICAL";
-      reasons.push(`book data: ${r.missedPayoutRuns} payout runs missed`);
-    } else if (r.status === "OVERDUE") {
-      priority = max(priority, "HIGH");
-      reasons.push("book data: payout overdue");
-    } else if (r.status === "BELOW_THRESHOLD" || r.status === "DUE_NEXT_RUN") {
-      // The author may feel it is late, but per policy nothing is overdue: a schedule/policy explanation.
-      priority = "MEDIUM";
-      factsSettled = true;
-      reasons.push(
-        r.status === "BELOW_THRESHOLD"
-          ? "book data: balance below ₹1,000 threshold (rolls over, not overdue)"
-          : "book data: not overdue, due in next payout run",
-      );
-    }
+  if (category === "ROYALTY_PAYMENTS" && context.royalty) {
+    const adjusted = applyRoyaltyFacts(priority, context.royalty);
+    priority = adjusted.priority;
+    factsSettled = adjusted.settled;
+    if (adjusted.reason) reasons.push(adjusted.reason);
   }
 
   // 4. Legal / rights issues are always critical; other urgency words escalate one level
@@ -145,16 +178,14 @@ export function ruleClassify(
     priority = "CRITICAL";
     reasons.push("legal/rights language");
   } else if (urgency.test(text) && priority !== "CRITICAL" && !factsSettled) {
-    priority = bump(priority);
+    priority = raiseOneLevel(priority);
     reasons.push("urgency language");
   }
 
-  const margin = best.score - (second?.score ?? 0);
-  const confidence = best.score === 0 ? 0.3 : Math.min(0.7, 0.4 + 0.05 * margin);
   return {
     category,
     priority,
-    confidence: Math.round(confidence * 100) / 100,
-    reasoning: `Rule-based: ${reasons.join("; ")}.`.slice(0, 300),
+    confidence: ruleConfidence(best.score, second?.score ?? 0),
+    reasoning: `Rule-based: ${reasons.join("; ")}.`.slice(0, reasoningMaxChars),
   };
 }

@@ -16,150 +16,172 @@ import type {
   TicketNoteRecord,
   TicketQueueRecord,
   TicketRecord,
-  UserRecord,
+  UserSummary,
+  UserWithProfile,
 } from "../repositories/types";
 import { iso, isoRequired } from "./common";
 
-type UserLite = Pick<UserRecord, "_id" | "name" | "email">;
+/** Shown when a referenced user no longer exists, so a list row never breaks. */
+const unknownAuthorName = "Unknown author";
+const unknownAdminName = "Unknown admin";
+/** Events without an actor (e.g. older records) are attributed to the system. */
+const systemActorName = "System";
+/** AI status before the first classification attempt has finished. */
+const defaultAiStatus = "PENDING";
 
-export function toMessageDTO(m: TicketMessageRecord): TicketMessageDTO {
+export function toMessageDTO(message: TicketMessageRecord): TicketMessageDTO {
   return {
-    id: m._id.toString(),
-    senderRole: m.senderRole,
-    senderName: m.senderName,
-    body: m.body,
-    aiAssisted: Boolean(m.aiAssisted),
-    createdAt: isoRequired(m.createdAt),
+    id: message._id.toString(),
+    senderRole: message.senderRole,
+    senderName: message.senderName,
+    body: message.body,
+    aiAssisted: Boolean(message.aiAssisted),
+    createdAt: isoRequired(message.createdAt),
   };
 }
 
-function toBookRef(t: Pick<TicketRecord, "bookId" | "bookSnapshot">): TicketBookRefDTO | null {
-  if (!t.bookId) return null;
+function toBookRef(ticket: Pick<TicketRecord, "bookId" | "bookSnapshot">): TicketBookRefDTO | null {
+  if (!ticket.bookId) return null;
   return {
-    id: t.bookId.toString(),
-    title: t.bookSnapshot?.title ?? "",
-    isbn: t.bookSnapshot?.isbn ?? "",
+    id: ticket.bookId.toString(),
+    title: ticket.bookSnapshot?.title ?? "",
+    isbn: ticket.bookSnapshot?.isbn ?? "",
   };
 }
 
-function toAttachment(a: TicketRecord["attachment"]) {
+function toAttachment(attachment: TicketRecord["attachment"]) {
   // The MIME type is stored but not part of the public contract.
-  return a ? { name: a.name, size: a.size } : null;
+  return attachment ? { name: attachment.name, size: attachment.size } : null;
 }
 
 /**
  * Author view. Built field-by-field (an allow-list) so that classification, AI data,
  * assignee and notes can never leak by accident when the ticket schema grows.
  */
-export function toAuthorTicketDTO(t: AuthorTicketRecord): AuthorTicketDTO {
+export function toAuthorTicketDTO(ticket: AuthorTicketRecord): AuthorTicketDTO {
   return {
-    id: t._id.toString(),
-    ticketNumber: t.ticketNumber,
-    subject: t.subject,
-    description: t.description,
-    status: t.status,
-    book: toBookRef(t),
-    attachment: toAttachment(t.attachment),
-    messages: (t.messages ?? []).map(toMessageDTO),
-    createdAt: isoRequired(t.createdAt),
-    updatedAt: isoRequired(t.updatedAt),
+    id: ticket._id.toString(),
+    ticketNumber: ticket.ticketNumber,
+    subject: ticket.subject,
+    description: ticket.description,
+    status: ticket.status,
+    book: toBookRef(ticket),
+    attachment: toAttachment(ticket.attachment),
+    messages: (ticket.messages ?? []).map(toMessageDTO),
+    createdAt: isoRequired(ticket.createdAt),
+    updatedAt: isoRequired(ticket.updatedAt),
   };
 }
 
 type ListSource = TicketQueueRecord | TicketRecord;
 
-export function toAdminListItemDTO(
-  t: ListSource,
-  users: Map<string, UserLite>,
-): AdminTicketListItemDTO {
-  const author = users.get(t.authorId.toString());
-  const assignee = t.assigneeId ? users.get(t.assigneeId.toString()) : undefined;
-  const messageCount = "messageCount" in t ? t.messageCount : t.messages.length;
-  const lastMessageAt =
-    "lastMessageAt" in t ? t.lastMessageAt : (t.messages.at(-1)?.createdAt ?? null);
+/** Queue rows carry Mongo-computed aggregates; a full ticket computes them from its thread. */
+function messageStats(ticket: ListSource) {
+  if ("messageCount" in ticket) {
+    return { messageCount: ticket.messageCount, lastMessageAt: ticket.lastMessageAt };
+  }
   return {
-    id: t._id.toString(),
-    ticketNumber: t.ticketNumber,
-    subject: t.subject,
-    status: t.status,
-    category: t.category ?? null,
-    categorySource: t.categorySource ?? null,
-    priority: t.priority ?? null,
-    prioritySource: t.prioritySource ?? null,
-    aiStatus: t.ai?.status ?? "PENDING",
+    messageCount: ticket.messages.length,
+    lastMessageAt: ticket.messages.at(-1)?.createdAt ?? null,
+  };
+}
+
+export function toAdminListItemDTO(
+  ticket: ListSource,
+  users: Map<string, UserSummary>,
+): AdminTicketListItemDTO {
+  const author = users.get(ticket.authorId.toString());
+  const assignee = ticket.assigneeId ? users.get(ticket.assigneeId.toString()) : undefined;
+  const { messageCount, lastMessageAt } = messageStats(ticket);
+  return {
+    id: ticket._id.toString(),
+    ticketNumber: ticket.ticketNumber,
+    subject: ticket.subject,
+    status: ticket.status,
+    category: ticket.category ?? null,
+    categorySource: ticket.categorySource ?? null,
+    priority: ticket.priority ?? null,
+    prioritySource: ticket.prioritySource ?? null,
+    aiStatus: ticket.ai?.status ?? defaultAiStatus,
     author: {
-      id: t.authorId.toString(),
-      name: author?.name ?? "Unknown author",
+      id: ticket.authorId.toString(),
+      name: author?.name ?? unknownAuthorName,
       email: author?.email ?? "",
     },
-    book: toBookRef(t),
-    assignee: t.assigneeId
-      ? { id: t.assigneeId.toString(), name: assignee?.name ?? "Unknown admin" }
+    book: toBookRef(ticket),
+    assignee: ticket.assigneeId
+      ? { id: ticket.assigneeId.toString(), name: assignee?.name ?? unknownAdminName }
       : null,
     messageCount,
     lastMessageAt: iso(lastMessageAt),
-    createdAt: isoRequired(t.createdAt),
-    updatedAt: isoRequired(t.updatedAt),
+    createdAt: isoRequired(ticket.createdAt),
+    updatedAt: isoRequired(ticket.updatedAt),
   };
 }
 
-export function toNoteDTO(n: TicketNoteRecord): TicketNoteDTO {
+export function toNoteDTO(note: TicketNoteRecord): TicketNoteDTO {
   return {
-    id: n._id.toString(),
-    adminName: n.adminName,
-    body: n.body,
-    createdAt: isoRequired(n.createdAt),
+    id: note._id.toString(),
+    adminName: note.adminName,
+    body: note.body,
+    createdAt: isoRequired(note.createdAt),
   };
 }
 
-export function toEventDTO(e: TicketEventRecord): TicketEventDTO {
+export function toEventDTO(event: TicketEventRecord): TicketEventDTO {
   return {
-    id: e._id.toString(),
-    type: e.type,
-    actorName: e.actorName || "System",
-    from: e.from ?? null,
-    to: e.to ?? null,
-    createdAt: isoRequired(e.createdAt),
+    id: event._id.toString(),
+    type: event.type,
+    actorName: event.actorName || systemActorName,
+    from: event.from ?? null,
+    to: event.to ?? null,
+    createdAt: isoRequired(event.createdAt),
   };
 }
 
 export interface AdminDetailContext {
-  author: Pick<UserRecord, "_id" | "name" | "email" | "authorProfile"> | null;
-  assignee: UserLite | null;
+  author: UserWithProfile | null;
+  assignee: UserSummary | null;
   book: BookDTO | null;
   notes: TicketNoteRecord[];
   events: TicketEventRecord[];
 }
 
-export function toAdminTicketDetailDTO(t: TicketRecord, ctx: AdminDetailContext): AdminTicketDetailDTO {
-  const users = new Map<string, UserLite>();
-  if (ctx.author) users.set(ctx.author._id.toString(), ctx.author);
-  if (ctx.assignee) users.set(ctx.assignee._id.toString(), ctx.assignee);
-  const profile = ctx.author?.authorProfile;
+function toAuthorProfileDTO(profile: UserWithProfile["authorProfile"]) {
+  if (!profile) return null;
   return {
-    ...toAdminListItemDTO(t, users),
-    description: t.description,
-    attachment: toAttachment(t.attachment),
+    code: profile.code,
+    phone: profile.phone ?? "",
+    city: profile.city ?? "",
+    joinedDate: isoRequired(profile.joinedDate),
+  };
+}
+
+export function toAdminTicketDetailDTO(
+  ticket: TicketRecord,
+  context: AdminDetailContext,
+): AdminTicketDetailDTO {
+  const users = new Map<string, UserSummary>();
+  for (const user of [context.author, context.assignee]) {
+    if (user) users.set(user._id.toString(), user);
+  }
+  return {
+    ...toAdminListItemDTO(ticket, users),
+    description: ticket.description,
+    attachment: toAttachment(ticket.attachment),
     ai: {
-      status: t.ai?.status ?? "PENDING",
-      confidence: t.ai?.confidence ?? null,
-      reasoning: t.ai?.reasoning ?? null,
-      model: t.ai?.model ?? null,
-      error: t.ai?.error ?? null,
+      status: ticket.ai?.status ?? defaultAiStatus,
+      confidence: ticket.ai?.confidence ?? null,
+      reasoning: ticket.ai?.reasoning ?? null,
+      model: ticket.ai?.model ?? null,
+      error: ticket.ai?.error ?? null,
     },
-    authorProfile: profile
-      ? {
-          code: profile.code,
-          phone: profile.phone ?? "",
-          city: profile.city ?? "",
-          joinedDate: isoRequired(profile.joinedDate),
-        }
-      : null,
-    bookDetails: ctx.book,
-    messages: t.messages.map(toMessageDTO),
-    notes: ctx.notes.map(toNoteDTO),
-    events: ctx.events.map(toEventDTO),
-    firstResponseAt: iso(t.firstResponseAt),
-    resolvedAt: iso(t.resolvedAt),
+    authorProfile: toAuthorProfileDTO(context.author?.authorProfile),
+    bookDetails: context.book,
+    messages: ticket.messages.map(toMessageDTO),
+    notes: context.notes.map(toNoteDTO),
+    events: context.events.map(toEventDTO),
+    firstResponseAt: iso(ticket.firstResponseAt),
+    resolvedAt: iso(ticket.resolvedAt),
   };
 }

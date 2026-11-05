@@ -1,6 +1,15 @@
 import "server-only";
 import { Schema, model, models, type InferSchemaType, type Model, type Types } from "mongoose";
 import { ticketEventTypes } from "@/shared/constants/ticket";
+import { secondsPerDay } from "../../lib/time";
+
+/** Usage logs are cost telemetry, not an audit trail: keep 90 days. */
+const aiUsageLogTtlSeconds = 90 * secondsPerDay;
+/** Matches the login rate-limit window (see lib/rateLimit.ts). */
+export const loginAttemptTtlSeconds = 15 * 60;
+/** Ticket numbers start after this offset (T-1001, T-1002, …). */
+const sequenceOffset = 1000;
+const ticketNumberPrefix = "T-";
 
 /* ------------------------------------------------------------------ */
 /* Internal notes: admin-only, separate collection by design.          */
@@ -75,7 +84,7 @@ const aiUsageLogSchema = new Schema(
   },
   { timestamps: { createdAt: true, updatedAt: false }, collection: "ai_usage_logs" },
 );
-aiUsageLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });
+aiUsageLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: aiUsageLogTtlSeconds });
 export type AiUsageLogDoc = InferSchemaType<typeof aiUsageLogSchema> & { _id: Types.ObjectId };
 export const AiUsageLog: Model<InferSchemaType<typeof aiUsageLogSchema>> =
   models.AiUsageLog ?? model("AiUsageLog", aiUsageLogSchema);
@@ -91,13 +100,19 @@ export const Counter: Model<{ _id: string; seq: number }> =
   models.Counter ?? model("Counter", counterSchema);
 
 /** Atomic, race-free sequence: returns offset + 1, offset + 2, … */
-export async function nextSequence(name: string, offset = 1000): Promise<number> {
+export async function nextSequence(name: string, offset = sequenceOffset): Promise<number> {
   const doc = await Counter.findOneAndUpdate(
     { _id: name },
     { $inc: { seq: 1 } },
     { upsert: true, returnDocument: "after" },
   ).lean();
+  // `upsert` + `returnDocument: "after"` always yields a document.
   return offset + doc!.seq;
+}
+
+/** Next human-readable ticket number, e.g. "T-1001". */
+export async function nextTicketNumber(): Promise<string> {
+  return `${ticketNumberPrefix}${await nextSequence("ticket")}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -106,7 +121,7 @@ export async function nextSequence(name: string, offset = 1000): Promise<number>
 const loginAttemptSchema = new Schema(
   {
     key: { type: String, required: true, index: true }, // email or ip
-    createdAt: { type: Date, default: Date.now, expires: 15 * 60 },
+    createdAt: { type: Date, default: Date.now, expires: loginAttemptTtlSeconds },
   },
   { collection: "login_attempts", versionKey: false },
 );

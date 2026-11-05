@@ -39,4 +39,6 @@ export const Errors = {
   ticketClosed: () => new AppError("CONFLICT", "This ticket is closed. Please open a new ticket."),
   rateLimited: (msg = "Too many requests, please try again later") =>
     new AppError("RATE_LIMITED", msg),
+  internal: (msg = "Something went wrong on our side. Please try again.") =>
+    new AppError("INTERNAL_ERROR", msg),
 };

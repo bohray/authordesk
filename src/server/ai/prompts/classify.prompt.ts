@@ -8,18 +8,24 @@ import { neutraliseTags, truncate, wrapAuthorText } from "./sanitize";
 export const classifyPromptVersion = "classify-v1";
 export const classifyMaxDescriptionChars = 1500;
 export const classifyMaxOutputTokens = 200;
+const classifyMaxSubjectChars = 200;
+const classifyMaxContextChars = 400;
+/** Longest reasoning stored; matches the limit the prompt and JSON schema state. */
+const reasoningMaxChars = 300;
 
 /* ------------------------------------------------------------------ */
 /* Output contract                                                    */
 /* ------------------------------------------------------------------ */
-const upper = (v: unknown) => (typeof v === "string" ? v.trim().toUpperCase().replace(/[\s-]+/g, "_") : v);
+/** "high", " Royalty-Payments " → "HIGH", "ROYALTY_PAYMENTS": tolerate casing/spacing drift. */
+const toEnumKey = (value: unknown) =>
+  typeof value === "string" ? value.trim().toUpperCase().replace(/[\s-]+/g, "_") : value;
 
 export const classificationSchema = z.object({
-  category: z.preprocess(upper, z.enum(ticketCategories)),
-  priority: z.preprocess(upper, z.enum(ticketPriorities)),
+  category: z.preprocess(toEnumKey, z.enum(ticketCategories)),
+  priority: z.preprocess(toEnumKey, z.enum(ticketPriorities)),
   confidence: z.coerce.number().min(0).max(1),
   // Models occasionally overrun the limit; trimming is cheaper than a retry and loses nothing important.
-  reasoning: z.string().min(1).transform((s) => s.trim().slice(0, 300)),
+  reasoning: z.string().min(1).transform((reasoning) => reasoning.trim().slice(0, reasoningMaxChars)),
 });
 export type ClassificationOutput = z.infer<typeof classificationSchema>;
 
@@ -30,7 +36,7 @@ export const classifyJsonSchema: Record<string, unknown> = {
     category: { type: "string", enum: [...ticketCategories] },
     priority: { type: "string", enum: [...ticketPriorities] },
     confidence: { type: "number", minimum: 0, maximum: 1 },
-    reasoning: { type: "string", maxLength: 300 },
+    reasoning: { type: "string", maxLength: reasoningMaxChars },
   },
   required: ["category", "priority", "confidence", "reasoning"],
   additionalProperties: false,
@@ -38,13 +44,13 @@ export const classifyJsonSchema: Record<string, unknown> = {
 
 /** Tolerates ```json fences or prose around the object (some fallback models add them). */
 export function extractJson(text: string): unknown {
-  const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const unfenced = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   try {
-    return JSON.parse(t);
+    return JSON.parse(unfenced);
   } catch {
-    const start = t.indexOf("{");
-    const end = t.lastIndexOf("}");
-    if (start >= 0 && end > start) return JSON.parse(t.slice(start, end + 1));
+    const start = unfenced.indexOf("{");
+    const end = unfenced.lastIndexOf("}");
+    if (start >= 0 && end > start) return JSON.parse(unfenced.slice(start, end + 1));
     throw new Error("no JSON object found");
   }
 }
@@ -96,12 +102,14 @@ const fewShots: { ticket: string; out: ClassificationOutput }[] = [
   },
 ];
 
-export function buildClassifySystemPrompt(p: PublisherNames): string {
+export function buildClassifySystemPrompt(publisher: PublisherNames): string {
   const cats = Object.entries(categoryDefinitions)
-    .map(([k, v]) => `- ${k}: ${v}`)
+    .map(([category, definition]) => `- ${category}: ${definition}`)
     .join("\n");
-  const shots = fewShots.map((s) => `Ticket: ${s.ticket}\nJSON: ${JSON.stringify(s.out)}`).join("\n\n");
-  return `You are the ticket triage system for ${p.name}, a self-publishing company. Classify each author support ticket into exactly one category and one priority.
+  const shots = fewShots
+    .map((shot) => `Ticket: ${shot.ticket}\nJSON: ${JSON.stringify(shot.out)}`)
+    .join("\n\n");
+  return `You are the ticket triage system for ${publisher.name}, a self-publishing company. Classify each author support ticket into exactly one category and one priority.
 
 Categories:
 ${cats}
@@ -130,11 +138,11 @@ export interface ClassifyTicketInput {
   context: string;
 }
 
-export function buildClassifyUserPrompt(t: ClassifyTicketInput): string {
+export function buildClassifyUserPrompt(ticket: ClassifyTicketInput): string {
   return `<ticket>
-Subject: ${wrapAuthorText(t.subject, 200)}
-Description: ${wrapAuthorText(t.description, classifyMaxDescriptionChars)}
-Context: ${neutraliseTags(truncate(t.context, 400))}
+Subject: ${wrapAuthorText(ticket.subject, classifyMaxSubjectChars)}
+Description: ${wrapAuthorText(ticket.description, classifyMaxDescriptionChars)}
+Context: ${neutraliseTags(truncate(ticket.context, classifyMaxContextChars))}
 </ticket>
 Return the JSON object for this ticket.`;
 }

@@ -5,7 +5,7 @@ import { generalBookOption } from "@/shared/constants/ticket";
 import type { CreateMessageInput, CreateTicketInput } from "@/shared/schemas/ticket.schema";
 import type { AuthorTicketDTO } from "@/shared/types/dto";
 import type { Session } from "../auth/session";
-import { nextSequence } from "../db/models";
+import { nextTicketNumber } from "../db/models";
 import { Errors } from "../http/errors";
 import { toAuthorTicketDTO } from "../mappers/ticket.mapper";
 import { findBookForAuthor } from "../repositories/book.repository";
@@ -15,13 +15,48 @@ import {
   findTicketForAuthor,
   listTicketsForAuthor,
   updateTicket,
+  type AuthorTicketRecord,
 } from "../repositories/ticket.repository";
+import type { BookRecord, TicketAiRecord } from "../repositories/types";
 import { runAfterResponse } from "./background";
+import { eventActor, newMessage } from "./ticketActivity";
 
 /**
  * Author-side ticket operations. Every query is scoped by the session's userId, so an
  * author can only ever see or touch their own tickets.
  */
+
+/** AI state of a brand-new ticket: classification has not run yet. */
+const pendingAiState: TicketAiRecord = {
+  status: "PENDING",
+  confidence: null,
+  reasoning: null,
+  model: null,
+  error: null,
+  attempts: 0,
+  lastAttemptAt: null,
+  suggestedCategory: null,
+  suggestedPriority: null,
+};
+
+const notYourBookMessage = "Select one of your own books";
+
+/** 404 rather than 403 for someone else's ticket, so ids can't be probed for existence. */
+async function loadMyTicket(session: Session, ticketId: string): Promise<AuthorTicketRecord> {
+  const ticket = await findTicketForAuthor(ticketId, session.userId);
+  if (!ticket) throw Errors.notFound("Ticket");
+  return ticket;
+}
+
+/** Resolves the "which book" choice; GENERAL means an account-level ticket with no book. */
+async function resolveTicketBook(session: Session, bookId: string): Promise<BookRecord | null> {
+  if (bookId === generalBookOption) return null;
+  const book = await findBookForAuthor(bookId, session.userId);
+  if (!book) {
+    throw Errors.validation([{ in: "body", path: "bookId", message: notYourBookMessage }]);
+  }
+  return book;
+}
 
 export async function listMyTickets(session: Session, page: number, limit: number) {
   const { items, total } = await listTicketsForAuthor(session.userId, (page - 1) * limit, limit);
@@ -29,56 +64,33 @@ export async function listMyTickets(session: Session, page: number, limit: numbe
 }
 
 export async function getMyTicket(session: Session, ticketId: string): Promise<AuthorTicketDTO> {
-  const ticket = await findTicketForAuthor(ticketId, session.userId);
-  // 404 rather than 403 for someone else's ticket, so ids can't be probed for existence.
-  if (!ticket) throw Errors.notFound("Ticket");
-  return toAuthorTicketDTO(ticket);
+  return toAuthorTicketDTO(await loadMyTicket(session, ticketId));
 }
 
 export async function createMyTicket(session: Session, input: CreateTicketInput): Promise<AuthorTicketDTO> {
-  let book: { id: Types.ObjectId; title: string; isbn: string } | null = null;
-  if (input.bookId !== generalBookOption) {
-    const found = await findBookForAuthor(input.bookId, session.userId);
-    if (!found) {
-      throw Errors.validation([
-        { in: "body", path: "bookId", message: "Select one of your own books" },
-      ]);
-    }
-    book = { id: found._id, title: found.title, isbn: found.isbn };
-  }
+  const book = await resolveTicketBook(session, input.bookId);
+  const { attachment } = input;
 
   const ticket = await createTicket({
-    ticketNumber: `T-${await nextSequence("ticket")}`,
+    ticketNumber: await nextTicketNumber(),
     authorId: new Types.ObjectId(session.userId),
-    bookId: book?.id ?? null,
+    bookId: book?._id ?? null,
     // Snapshot so the ticket still reads correctly if the book is renamed later.
     bookSnapshot: book ? { title: book.title, isbn: book.isbn } : null,
     subject: input.subject,
     description: input.description,
-    attachment: input.attachment
-      ? { name: input.attachment.name, size: input.attachment.size, type: input.attachment.type }
+    attachment: attachment
+      ? { name: attachment.name, size: attachment.size, type: attachment.type }
       : null,
     status: "OPEN",
-    ai: {
-      status: "PENDING",
-      confidence: null,
-      reasoning: null,
-      model: null,
-      error: null,
-      attempts: 0,
-      lastAttemptAt: null,
-      suggestedCategory: null,
-      suggestedPriority: null,
-    },
+    ai: { ...pendingAiState },
   });
 
-  await recordEvents([
-    { ticketId: ticket._id, type: "CREATED", actorId: session.userId, actorName: session.name, to: "OPEN" },
-  ]);
+  await recordEvents([{ ...eventActor(session, ticket._id), type: "CREATED", to: "OPEN" }]);
 
   // Classification can take seconds (LLM call); the author gets the 201 immediately.
-  const id = ticket._id.toString();
-  runAfterResponse("classifyTicket", () => classifyTicket(id));
+  const ticketIdText = ticket._id.toString();
+  runAfterResponse("classifyTicket", () => classifyTicket(ticketIdText));
 
   return toAuthorTicketDTO(ticket);
 }
@@ -88,21 +100,13 @@ export async function addMyMessage(
   ticketId: string,
   input: CreateMessageInput,
 ): Promise<AuthorTicketDTO> {
-  const ticket = await findTicketForAuthor(ticketId, session.userId);
-  if (!ticket) throw Errors.notFound("Ticket");
+  const ticket = await loadMyTicket(session, ticketId);
   if (ticket.status === "CLOSED") throw Errors.ticketClosed();
 
   // A follow-up on a resolved ticket means the issue isn't solved: reopen it.
   const reopen = ticket.status === "RESOLVED";
-  const message = {
-    _id: new Types.ObjectId(),
-    senderId: new Types.ObjectId(session.userId),
-    senderRole: "AUTHOR" as const,
-    senderName: session.name,
-    body: input.body, // aiAssisted is deliberately ignored for authors
-    aiAssisted: false,
-    createdAt: new Date(),
-  };
+  // aiAssisted is deliberately ignored for authors.
+  const message = newMessage(session, "AUTHOR", input.body);
 
   const updated = await updateTicket(
     ticket._id,
@@ -117,14 +121,7 @@ export async function addMyMessage(
 
   if (reopen) {
     await recordEvents([
-      {
-        ticketId: ticket._id,
-        type: "STATUS_CHANGED",
-        actorId: session.userId,
-        actorName: session.name,
-        from: "RESOLVED",
-        to: "OPEN",
-      },
+      { ...eventActor(session, ticket._id), type: "STATUS_CHANGED", from: "RESOLVED", to: "OPEN" },
     ]);
   }
   return toAuthorTicketDTO(updated);

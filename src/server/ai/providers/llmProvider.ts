@@ -81,10 +81,25 @@ export function errorFromStatus(
   return new LLMError("UNAVAILABLE", message, { provider, retryable: false });
 }
 
+/** Error names fetch / AbortSignal use when a request is cancelled or times out. */
+const abortErrorNames: readonly unknown[] = ["AbortError", "TimeoutError"];
+
 export function isAbortError(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    ((e as { name?: string }).name === "AbortError" || (e as { name?: string }).name === "TimeoutError")
-  );
+  return typeof e === "object" && e !== null && "name" in e && abortErrorNames.includes(e.name);
+}
+
+/**
+ * Longest slice of a provider error message kept in logs and on the ticket. Messages can echo
+ * request details, so only a short prefix is stored.
+ */
+export const providerErrorMaxChars = 160;
+
+/** The `message` property of an unknown thrown value, if it has one. */
+export function messageOf(e: unknown): unknown {
+  return typeof e === "object" && e !== null && "message" in e ? e.message : undefined;
+}
+
+/** The message of an unknown thrown value (or the value itself), truncated to `maxChars`. */
+export function errorText(e: unknown, maxChars = providerErrorMaxChars): string {
+  return String(messageOf(e) ?? e).slice(0, maxChars);
 }

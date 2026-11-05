@@ -2,13 +2,19 @@ import "server-only";
 import { Types, type PipelineStage, type UpdateQuery } from "mongoose";
 import {
   unresolvedStatuses,
+  type QueueSort,
   type TicketCategory,
   type TicketPriority,
   type TicketStatus,
 } from "@/shared/constants/ticket";
 import { Ticket } from "../db/models";
 import type { Id, TicketQueueRecord, TicketRecord } from "./types";
-const oid = (id: Id) => (typeof id === "string" ? new Types.ObjectId(id) : id);
+
+const toObjectId = (id: Id) => (typeof id === "string" ? new Types.ObjectId(id) : id);
+
+/** Stable "newest first" order; _id breaks ties between tickets created in the same ms. */
+const newestFirst = { createdAt: -1, _id: -1 } as const;
+const oldestFirst = { createdAt: 1, _id: 1 } as const;
 
 /** Fields an author view needs. Admin-only data is excluded at the query level too. */
 const authorProjection = {
@@ -50,7 +56,7 @@ export async function listTicketsForAuthor(authorId: Id, skip: number, limit: nu
   // Uses the { authorId, createdAt } index for both the page and the count.
   const [items, total] = await Promise.all([
     Ticket.find(filter, authorProjection)
-      .sort({ createdAt: -1, _id: -1 })
+      .sort(newestFirst)
       .skip(skip)
       .limit(limit)
       .lean<AuthorTicketRecord[]>(),
@@ -92,29 +98,42 @@ export interface QueueCriteria {
   /** Exclusive upper bound. */
   createdBefore?: Date;
   search?: string;
-  sort: "urgency" | "newest" | "oldest";
+  sort: QueueSort;
   skip: number;
   limit: number;
 }
 
-const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function buildQueueMatch(c: QueueCriteria): Record<string, unknown> {
+/** Fields the queue's free-text search matches against (case-insensitive substring). */
+const searchableFields = ["subject", "ticketNumber", "description"] as const;
+
+/**
+ * Computed sort key: 0 for OPEN/IN_PROGRESS, 1 for RESOLVED/CLOSED, so live work comes first.
+ * Never returned to callers.
+ */
+const resolvedSortKey = "_resolved";
+
+/** Heavy fields a list view never shows, plus the computed sort key. */
+const queueRowExclusions = { messages: 0, description: 0, [resolvedSortKey]: 0 } as const;
+
+function buildQueueMatch(criteria: QueueCriteria): Record<string, unknown> {
   // Aggregation does not cast like find() does, so ids and dates must be real BSON types.
+  const { statuses, categories, priorities, assigneeId, createdFrom, createdBefore, search } = criteria;
   const match: Record<string, unknown> = {};
-  if (c.statuses?.length) match.status = { $in: c.statuses };
-  if (c.categories?.length) match.category = { $in: c.categories };
-  if (c.priorities?.length) match.priority = { $in: c.priorities };
-  if (c.assigneeId !== undefined) match.assigneeId = c.assigneeId === null ? null : oid(c.assigneeId);
-  if (c.createdFrom || c.createdBefore) {
+  if (statuses?.length) match.status = { $in: statuses };
+  if (categories?.length) match.category = { $in: categories };
+  if (priorities?.length) match.priority = { $in: priorities };
+  if (assigneeId !== undefined) match.assigneeId = assigneeId === null ? null : toObjectId(assigneeId);
+  if (createdFrom || createdBefore) {
     match.createdAt = {
-      ...(c.createdFrom ? { $gte: c.createdFrom } : {}),
-      ...(c.createdBefore ? { $lt: c.createdBefore } : {}),
+      ...(createdFrom ? { $gte: createdFrom } : {}),
+      ...(createdBefore ? { $lt: createdBefore } : {}),
     };
   }
-  if (c.search) {
-    const re = { $regex: escapeRegex(c.search), $options: "i" };
-    match.$or = [{ subject: re }, { ticketNumber: re }, { description: re }];
+  if (search) {
+    const pattern = { $regex: escapeRegex(search), $options: "i" };
+    match.$or = searchableFields.map((field) => ({ [field]: pattern }));
   }
   return match;
 }
@@ -122,12 +141,11 @@ function buildQueueMatch(c: QueueCriteria): Record<string, unknown> {
 /** Urgency order within one side (live or done). _id is the tiebreaker so pages are stable. */
 const urgencySort = { priorityRank: -1, createdAt: 1, _id: 1 } as const;
 
-const sorts: Record<QueueCriteria["sort"], Record<string, 1 | -1>> = {
-  // _resolved: 0 for OPEN/IN_PROGRESS, 1 for RESOLVED/CLOSED, so live work always comes first.
-  urgency: { _resolved: 1, ...urgencySort },
-  newest: { createdAt: -1, _id: -1 },
-  oldest: { createdAt: 1, _id: 1 },
-};
+const sortSpecs = {
+  urgency: { [resolvedSortKey]: 1, ...urgencySort },
+  newest: newestFirst,
+  oldest: oldestFirst,
+} satisfies Record<QueueSort, Record<string, 1 | -1>>;
 
 /**
  * The `_resolved` sort key is only needed when the result can mix live and done tickets.
@@ -137,21 +155,21 @@ const sorts: Record<QueueCriteria["sort"], Record<string, 1 | -1>> = {
  */
 function needsResolvedKey(statuses: TicketStatus[] | undefined): boolean {
   if (!statuses?.length) return true;
-  const live = statuses.filter((s) => unresolvedStatuses.includes(s)).length;
+  const live = statuses.filter((status) => unresolvedStatuses.includes(status)).length;
   return live > 0 && live < statuses.length;
 }
 
 /** One aggregation returns the page and the total, already sorted by urgency rank. */
-export async function queryAdminQueue(c: QueueCriteria) {
-  const resolvedKey = c.sort === "urgency" && needsResolvedKey(c.statuses);
-  const sort = c.sort === "urgency" && !resolvedKey ? urgencySort : sorts[c.sort];
+export async function queryAdminQueue(criteria: QueueCriteria) {
+  const withResolvedKey = criteria.sort === "urgency" && needsResolvedKey(criteria.statuses);
+  const sort = criteria.sort === "urgency" && !withResolvedKey ? urgencySort : sortSpecs[criteria.sort];
   const pipeline: PipelineStage[] = [
-    { $match: buildQueueMatch(c) },
-    ...(resolvedKey
+    { $match: buildQueueMatch(criteria) },
+    ...(withResolvedKey
       ? [
           {
             $addFields: {
-              _resolved: { $cond: [{ $in: ["$status", [...unresolvedStatuses]] }, 0, 1] },
+              [resolvedSortKey]: { $cond: [{ $in: ["$status", [...unresolvedStatuses]] }, 0, 1] },
             },
           },
         ]
@@ -160,8 +178,8 @@ export async function queryAdminQueue(c: QueueCriteria) {
     {
       $facet: {
         items: [
-          { $skip: c.skip },
-          { $limit: c.limit },
+          { $skip: criteria.skip },
+          { $limit: criteria.limit },
           {
             // Don't ship message bodies/descriptions for a list view; compute the aggregates here.
             $addFields: {
@@ -169,16 +187,16 @@ export async function queryAdminQueue(c: QueueCriteria) {
               lastMessageAt: { $ifNull: [{ $max: "$messages.createdAt" }, null] },
             },
           },
-          { $project: { messages: 0, description: 0, _resolved: 0 } },
+          { $project: queueRowExclusions },
         ],
         total: [{ $count: "n" }],
       },
     },
   ];
-  const [res] = await Ticket.aggregate<{ items: TicketQueueRecord[]; total: { n: number }[] }>(
+  const [result] = await Ticket.aggregate<{ items: TicketQueueRecord[]; total: { n: number }[] }>(
     pipeline,
   );
-  return { items: res?.items ?? [], total: res?.total[0]?.n ?? 0 };
+  return { items: result?.items ?? [], total: result?.total[0]?.n ?? 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +230,7 @@ export interface TicketStatsRaw {
 export async function getTicketStats(): Promise<TicketStatsRaw> {
   const unresolved = { status: { $in: [...unresolvedStatuses] } };
   const hasSuggestion = { $ne: [{ $ifNull: ["$ai.suggestedCategory", null] }, null] };
-  const [res] = await Ticket.aggregate<TicketStatsRaw>([
+  const [stats] = await Ticket.aggregate<TicketStatsRaw>([
     {
       $facet: {
         byStatus: [{ $group: { _id: "$status", n: { $sum: 1 } } }],
@@ -250,5 +268,5 @@ export async function getTicketStats(): Promise<TicketStatsRaw> {
       },
     },
   ]);
-  return res;
+  return stats;
 }

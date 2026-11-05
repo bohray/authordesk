@@ -4,26 +4,32 @@ import { toBookDTO } from "../mappers/book.mapper";
 import { findBooksByAuthor } from "../repositories/book.repository";
 import { payoutThreshold, nextPayoutDate } from "./royaltySchedule";
 
+/** Unpublished books (no date) sort after every dated one. */
+const publicationTime = (book: BookDTO) =>
+  book.publicationDate ? Date.parse(book.publicationDate) : -Infinity;
+
 /** Published books first, then the most recently published; unpublished (null date) last. */
-function compareBooks(a: BookDTO, b: BookDTO) {
-  if (a.isPublished !== b.isPublished) return a.isPublished ? -1 : 1;
-  const da = a.publicationDate ? Date.parse(a.publicationDate) : -Infinity;
-  const db = b.publicationDate ? Date.parse(b.publicationDate) : -Infinity;
-  if (da !== db) return db > da ? 1 : -1;
-  return a.code.localeCompare(b.code);
+function compareBooks(first: BookDTO, second: BookDTO) {
+  if (first.isPublished !== second.isPublished) return first.isPublished ? -1 : 1;
+  const firstDate = publicationTime(first);
+  const secondDate = publicationTime(second);
+  if (firstDate !== secondDate) return secondDate > firstDate ? 1 : -1;
+  return first.code.localeCompare(second.code);
 }
+
+const emptyTotals = { copiesSold: 0, earned: 0, paid: 0, pending: 0 };
 
 export async function getMyBooks(authorId: string, today = new Date()): Promise<MyBooksDTO> {
   // An author has a handful of books, so sorting in memory keeps the sort rule in one place.
   const books = (await findBooksByAuthor(authorId)).map(toBookDTO).sort(compareBooks);
   const totals = books.reduce(
-    (acc, b) => ({
-      copiesSold: acc.copiesSold + b.copiesSold,
-      earned: acc.earned + b.royalty.earned,
-      paid: acc.paid + b.royalty.paid,
-      pending: acc.pending + b.royalty.pending,
+    (sum, book) => ({
+      copiesSold: sum.copiesSold + book.copiesSold,
+      earned: sum.earned + book.royalty.earned,
+      paid: sum.paid + book.royalty.paid,
+      pending: sum.pending + book.royalty.pending,
     }),
-    { copiesSold: 0, earned: 0, paid: 0, pending: 0 },
+    emptyTotals,
   );
   return {
     books,

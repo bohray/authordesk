@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import type { Role } from "@/shared/constants/roles";
+import { userRoles, type Role } from "@/shared/constants/roles";
 
 /**
  * JWT helpers. Deliberately free of `server-only`/Mongo imports so `src/proxy.ts`
@@ -13,13 +13,19 @@ export interface SessionClaims {
   authorCode?: string;
 }
 
+const signingAlgorithm = "HS256";
+
 function key(secret: string) {
   return new TextEncoder().encode(secret);
 }
 
+function isRole(value: unknown): value is Role {
+  return userRoles.some((role) => role === value);
+}
+
 export async function signSession(claims: SessionClaims, secret: string, ttlHours: number) {
   return new SignJWT({ role: claims.role, name: claims.name, email: claims.email, authorCode: claims.authorCode })
-    .setProtectedHeader({ alg: "HS256" })
+    .setProtectedHeader({ alg: signingAlgorithm })
     .setSubject(claims.sub)
     .setIssuedAt()
     .setExpirationTime(`${ttlHours}h`)
@@ -28,8 +34,8 @@ export async function signSession(claims: SessionClaims, secret: string, ttlHour
 
 export async function verifySession(token: string, secret: string): Promise<SessionClaims | null> {
   try {
-    const { payload } = await jwtVerify(token, key(secret), { algorithms: ["HS256"] });
-    if (!payload.sub || (payload.role !== "AUTHOR" && payload.role !== "ADMIN")) return null;
+    const { payload } = await jwtVerify(token, key(secret), { algorithms: [signingAlgorithm] });
+    if (!payload.sub || !isRole(payload.role)) return null;
     return {
       sub: payload.sub,
       role: payload.role,

@@ -1,10 +1,14 @@
 import "server-only";
 import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { env } from "@/server/config/env";
+import { msPerSecond } from "@/server/lib/time";
 import {
   LLMError,
   errorFromStatus,
+  errorText,
   isAbortError,
+  messageOf,
+  providerErrorMaxChars,
   type LLMProvider,
   type LLMRequest,
   type LLMResponse,
@@ -12,9 +16,13 @@ import {
 } from "./llmProvider";
 
 /** Gemini errors embed `"retryDelay": "23s"` in the message body for 429s. */
+const retryDelayPattern = /retryDelay"?\s*:\s*"?(\d+(?:\.\d+)?)s/;
+/** The SDK reports timeouts and aborts with these words rather than a typed error. */
+const timeoutMessagePattern = /aborted|timed? ?out/i;
+
 function parseRetryDelay(message: string): number | null {
-  const m = /retryDelay"?\s*:\s*"?(\d+(?:\.\d+)?)s/.exec(message);
-  return m ? Math.round(parseFloat(m[1]) * 1000) : null;
+  const match = retryDelayPattern.exec(message);
+  return match ? Math.round(parseFloat(match[1]) * msPerSecond) : null;
 }
 
 /**
@@ -85,15 +93,15 @@ export class GeminiProvider implements LLMProvider {
 
   private mapError(e: unknown): LLMError {
     if (e instanceof LLMError) return e;
-    if (isAbortError(e) || /aborted|timed? ?out/i.test(String((e as Error)?.message ?? ""))) {
+    if (isAbortError(e) || timeoutMessagePattern.test(String(messageOf(e) ?? ""))) {
       return new LLMError("TIMEOUT", "Gemini request timed out", { provider: this.name });
     }
     if (e instanceof ApiError) {
       // Message may contain request details; keep only a short prefix for logs/DB.
-      const msg = `Gemini HTTP ${e.status}: ${e.message.slice(0, 160)}`;
+      const msg = `Gemini HTTP ${e.status}: ${e.message.slice(0, providerErrorMaxChars)}`;
       return errorFromStatus(this.name, e.status, msg, parseRetryDelay(e.message));
     }
-    return new LLMError("UNAVAILABLE", `Gemini network error: ${String((e as Error)?.message ?? e).slice(0, 160)}`, {
+    return new LLMError("UNAVAILABLE", `Gemini network error: ${errorText(e)}`, {
       provider: this.name,
     });
   }

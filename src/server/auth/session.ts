@@ -2,6 +2,7 @@ import "server-only";
 import type { NextRequest, NextResponse } from "next/server";
 import { sessionCookie } from "@/shared/constants/roles";
 import { env } from "../config/env";
+import { secondsPerHour } from "../lib/time";
 import { signSession, verifySession, type SessionClaims } from "./jwt";
 
 export interface Session {
@@ -34,7 +35,7 @@ export async function setSessionCookie(res: NextResponse, claims: SessionClaims)
     secure: NODE_ENV === "production",
     sameSite: "lax", // blocks cross-site POSTs (CSRF) while allowing normal navigation
     path: "/",
-    maxAge: SESSION_TTL_HOURS * 3600,
+    maxAge: SESSION_TTL_HOURS * secondsPerHour,
   });
 }
 

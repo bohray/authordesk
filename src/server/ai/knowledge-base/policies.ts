@@ -18,20 +18,20 @@ export type KbSectionKey =
   | "PRODUCTION"
   | "METADATA_UPDATES";
 
-export function kbSections(p: PublisherNames): Record<KbSectionKey, string> {
-  const P = p.name;
+export function kbSections(publisher: PublisherNames): Record<KbSectionKey, string> {
+  const name = publisher.name;
   return {
     // Always-on, ~40 tokens: enough identity for any reply without paying for the full overview.
-    OVERVIEW_BRIEF: `${P} is a self-publishing company operating in India and the US. It handles cover design, typesetting, ISBN assignment, printing, distribution, and royalty management for its authors.`,
+    OVERVIEW_BRIEF: `${name} is a self-publishing company operating in India and the US. It handles cover design, typesetting, ISBN assignment, printing, distribution, and royalty management for its authors.`,
 
     OVERVIEW_FULL: `Company Overview:
-- ${P} is a self-publishing company operating in India and the US.
+- ${name} is a self-publishing company operating in India and the US.
 - Packages: Standard Free (no upfront cost) and Bestseller Breakthrough (premium, paid package with marketing and distribution add-ons).
 - Handles cover design, typesetting, ISBN assignment, printing, distribution, and royalty management.
 - In-house printing facility and warehouse in Delhi. Print partners include Repro India and Epitome Books.`,
 
     ROYALTY: `Royalty Policy:
-- 80/20 royalty split: 80% of the net profit per book goes to the author, 20% to ${P}.
+- 80/20 royalty split: 80% of the net profit per book goes to the author, 20% to ${name}.
 - Net profit = MRP minus printing cost, platform commission (Amazon/Flipkart), and shipping charges.
 - Royalties are calculated quarterly and paid within 45 days of the quarter ending.
 - Minimum payout threshold: ₹1,000. If accumulated royalties are below this, they roll over to the next quarter.
@@ -39,8 +39,8 @@ export function kbSections(p: PublisherNames): Record<KbSectionKey, string> {
 - Authors can view a detailed royalty breakdown in their dashboard, showing sales figures per platform.`,
 
     ISBN: `ISBN Policy:
-- Every book receives a unique ISBN assigned by ${P}.
-- ISBNs are registered under ${P}'s imprint. If an author wants an ISBN under their own imprint, they need to obtain it independently.
+- Every book receives a unique ISBN assigned by ${name}.
+- ISBNs are registered under ${name}'s imprint. If an author wants an ISBN under their own imprint, they need to obtain it independently.
 - ISBN errors (duplicate, wrong book linked) are treated as high-priority and escalated to the production team.`,
 
     PRINTING: `Printing & Quality:
@@ -49,7 +49,7 @@ export function kbSections(p: PublisherNames): Record<KbSectionKey, string> {
 - Quality issues (misprints, binding defects, color inconsistency): free reprint after verification. The author may need to share photos of the defective copy.`,
 
     DISTRIBUTION: `Distribution & Availability:
-- Listed on Amazon India, Flipkart, Amazon US, Amazon UK, and the ${p.store}.
+- Listed on Amazon India, Flipkart, Amazon US, Amazon UK, and the ${publisher.store}.
 - New listings typically go live within 7–10 business days after publication is complete.
 - "Unavailable" on a platform usually indicates a stock sync issue; the team can trigger a re-sync within 24–48 hours.`,
 

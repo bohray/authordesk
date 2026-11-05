@@ -8,6 +8,8 @@ export interface AiUsageTotals {
   outputTokens: number;
 }
 
+const emptyTotals: AiUsageTotals = { calls: 0, failures: 0, inputTokens: 0, outputTokens: 0 };
+
 /** Sums the whole log in one round trip (the collection is TTL-bounded to 90 days). */
 export async function getAiUsageTotals(): Promise<AiUsageTotals> {
   const [row] = await AiUsageLog.aggregate<AiUsageTotals>([
@@ -22,5 +24,5 @@ export async function getAiUsageTotals(): Promise<AiUsageTotals> {
     },
     { $project: { _id: 0 } },
   ]);
-  return row ?? { calls: 0, failures: 0, inputTokens: 0, outputTokens: 0 };
+  return row ?? { ...emptyTotals };
 }

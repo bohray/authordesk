@@ -29,6 +29,12 @@ export interface UserRecord {
   updatedAt: Date;
 }
 
+/** The minimal user fields list views show (name + email). */
+export type UserSummary = Pick<UserRecord, "_id" | "name" | "email">;
+
+/** User fields the admin ticket detail shows, including the author profile. */
+export type UserWithProfile = Pick<UserRecord, "_id" | "name" | "email" | "authorProfile">;
+
 export interface BookRecord {
   _id: Types.ObjectId;
   code: string;

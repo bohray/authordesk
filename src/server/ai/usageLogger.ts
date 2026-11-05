@@ -37,14 +37,14 @@ export function logUsage(entry: UsageEntry): void {
     return;
   }
   // Without a live connection (e.g. a unit test), skip rather than let Mongoose buffer.
-  if (mongoose.connection.readyState !== 1) return;
+  if (mongoose.connection.readyState !== mongoose.ConnectionStates.connected) return;
 
   const ticketId =
     entry.ticketId && mongoose.isValidObjectId(entry.ticketId) ? new mongoose.Types.ObjectId(entry.ticketId) : null;
-  const p = AiUsageLog.create({ ...entry, ticketId })
+  const write = AiUsageLog.create({ ...entry, ticketId })
     .catch((err: unknown) => logger.warn("ai.usage_log_failed", { error: String(err) }))
-    .finally(() => pending.delete(p));
-  pending.add(p);
+    .finally(() => pending.delete(write));
+  pending.add(write);
 }
 
 /** Await in-flight usage writes (tests; optionally before a serverless function ends). */

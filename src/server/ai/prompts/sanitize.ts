@@ -10,12 +10,17 @@ export function neutraliseTags(text: string): string {
 }
 
 /** Truncate on a word boundary and mark it, so the model knows text was cut (cost control). */
+/** Only back up to a word boundary if that keeps at least this share of the allowed text. */
+const minWordBoundaryRatio = 0.8;
+const truncationMarker = " …[truncated]";
+
 export function truncate(text: string, maxChars: number): string {
-  const t = text.trim();
-  if (t.length <= maxChars) return t;
-  const cut = t.slice(0, maxChars);
+  const trimmed = text.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  const cut = trimmed.slice(0, maxChars);
   const lastSpace = cut.lastIndexOf(" ");
-  return `${(lastSpace > maxChars * 0.8 ? cut.slice(0, lastSpace) : cut).trimEnd()} …[truncated]`;
+  const atWordBoundary = lastSpace > maxChars * minWordBoundaryRatio ? cut.slice(0, lastSpace) : cut;
+  return `${atWordBoundary.trimEnd()}${truncationMarker}`;
 }
 
 export function wrapAuthorText(text: string, maxChars: number): string {

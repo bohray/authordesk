@@ -1,7 +1,20 @@
 import "server-only";
+import type { Types } from "mongoose";
 import { priorityRankByLevel, type TicketCategory, type TicketPriority, type TicketStatus } from "@/shared/constants/ticket";
 import { hashPassword } from "../auth/password";
-import { AiDraft, AiUsageLog, Book, Counter, LoginAttempt, Ticket, TicketEvent, TicketNote, User, nextSequence } from "./models";
+import { msPerDay, msPerHour } from "../lib/time";
+import {
+  AiDraft,
+  AiUsageLog,
+  Book,
+  Counter,
+  LoginAttempt,
+  Ticket,
+  TicketEvent,
+  TicketNote,
+  User,
+  nextTicketNumber,
+} from "./models";
 
 /** Shape of data/sample-data.json (as provided). */
 export interface SampleData {
@@ -12,24 +25,27 @@ export interface SampleData {
     phone: string;
     city: string;
     joined_date: string;
-    books: {
-      book_id: string;
-      title: string;
-      isbn: string;
-      genre: string;
-      publication_date: string | null;
-      status: string;
-      mrp: number | null;
-      author_royalty_per_copy: number | null;
-      total_copies_sold: number;
-      total_royalty_earned: number;
-      royalty_paid: number;
-      royalty_pending: number;
-      last_royalty_payout_date: string | null;
-      print_partner: string | null;
-      available_on: string[];
-    }[];
+    books: SampleBook[];
   }[];
+}
+
+/** One book in the sample dataset (snake_case, as provided). */
+export interface SampleBook {
+  book_id: string;
+  title: string;
+  isbn: string;
+  genre: string;
+  publication_date: string | null;
+  status: string;
+  mrp: number | null;
+  author_royalty_per_copy: number | null;
+  total_copies_sold: number;
+  total_royalty_earned: number;
+  royalty_paid: number;
+  royalty_pending: number;
+  last_royalty_payout_date: string | null;
+  print_partner: string | null;
+  available_on: string[];
 }
 
 export const demoPasswords = { author: "Author@123", admin: "Admin@123" } as const;
@@ -144,10 +160,26 @@ const demoTickets: DemoTicket[] = [
   },
 ];
 
-const day = 24 * 60 * 60 * 1000;
+/** Demo tickets are created `daysAgo` days plus this offset before now… */
+const ticketCreatedOffsetMs = 2 * msPerHour;
+/** …answered this long after creation… */
+const demoReplyDelayMs = 3 * msPerHour;
+/** …and (when RESOLVED) resolved this long after creation. */
+const demoResolveDelayMs = 4 * msPerHour;
 
-/** Idempotent: wipes the app collections and re-creates the demo dataset. */
-export async function seedDatabase(data: SampleData, opts: { withDemoTickets?: boolean } = {}) {
+const demoAiState = {
+  status: "DONE",
+  confidence: 0.9,
+  reasoning: "Seeded demo ticket (pre-classified).",
+  model: "seed",
+  attempts: 1,
+} as const;
+
+type SeededBook = { id: string; title: string; isbn: string };
+type SeededAdmin = { _id: Types.ObjectId; name: string };
+
+/** Every collection the app writes to, so a re-seed starts from a clean slate. */
+async function clearCollections() {
   await Promise.all([
     User.deleteMany({}),
     Book.deleteMany({}),
@@ -159,6 +191,106 @@ export async function seedDatabase(data: SampleData, opts: { withDemoTickets?: b
     Counter.deleteMany({}),
     LoginAttempt.deleteMany({}),
   ]);
+}
+
+function toBookFields(book: SampleBook, authorId: Types.ObjectId) {
+  return {
+    code: book.book_id,
+    authorId,
+    title: book.title,
+    isbn: book.isbn,
+    genre: book.genre,
+    publicationDate: book.publication_date ? new Date(book.publication_date) : null,
+    status: book.status,
+    mrp: book.mrp,
+    royaltyPerCopy: book.author_royalty_per_copy,
+    copiesSold: book.total_copies_sold,
+    royalty: {
+      earned: book.total_royalty_earned,
+      paid: book.royalty_paid,
+      pending: book.royalty_pending,
+      lastPayoutDate: book.last_royalty_payout_date ? new Date(book.last_royalty_payout_date) : null,
+    },
+    printPartner: book.print_partner,
+    availableOn: book.available_on,
+  };
+}
+
+/** Creates each author with their books; returns lookups the demo tickets need. */
+async function seedAuthorsAndBooks(data: SampleData, passwordHash: string) {
+  const authorByCode = new Map<string, { id: string; name: string }>();
+  const bookByCode = new Map<string, SeededBook>();
+
+  for (const author of data.authors) {
+    const user = await User.create({
+      email: author.email,
+      name: author.name,
+      role: "AUTHOR",
+      passwordHash,
+      authorProfile: {
+        code: author.author_id,
+        phone: author.phone,
+        city: author.city,
+        joinedDate: new Date(author.joined_date),
+      },
+    });
+    authorByCode.set(author.author_id, { id: user._id.toString(), name: author.name });
+
+    const books = await Book.insertMany(author.books.map((book) => toBookFields(book, user._id)));
+    for (const book of books) {
+      bookByCode.set(book.code, { id: book._id.toString(), title: book.title, isbn: book.isbn });
+    }
+  }
+  return { authorByCode, bookByCode };
+}
+
+async function seedDemoTicket(
+  demo: DemoTicket,
+  author: { id: string; name: string },
+  book: SeededBook | null,
+  admin: SeededAdmin,
+) {
+  const createdAt = new Date(Date.now() - demo.daysAgo * msPerDay - ticketCreatedOffsetMs);
+  const messages = demo.reply
+    ? [
+        {
+          senderId: admin._id,
+          senderRole: "ADMIN",
+          senderName: admin.name,
+          body: demo.reply,
+          aiAssisted: true,
+          createdAt: new Date(createdAt.getTime() + demoReplyDelayMs),
+        },
+      ]
+    : [];
+  const hasOwner = demo.status === "IN_PROGRESS" || demo.status === "RESOLVED";
+  const ticket = await Ticket.create({
+    ticketNumber: await nextTicketNumber(),
+    authorId: author.id,
+    bookId: book?.id ?? null,
+    bookSnapshot: book ? { title: book.title, isbn: book.isbn } : null,
+    subject: demo.subject,
+    description: demo.description,
+    status: demo.status,
+    category: demo.category,
+    categorySource: "AI",
+    priority: demo.priority,
+    prioritySource: "AI",
+    priorityRank: priorityRankByLevel[demo.priority],
+    ai: { ...demoAiState, suggestedCategory: demo.category, suggestedPriority: demo.priority },
+    assigneeId: hasOwner ? admin._id : null,
+    messages,
+    firstResponseAt: messages[0]?.createdAt ?? null,
+    resolvedAt: demo.status === "RESOLVED" ? new Date(createdAt.getTime() + demoResolveDelayMs) : null,
+    createdAt,
+    updatedAt: messages[0]?.createdAt ?? createdAt,
+  });
+  await TicketEvent.create({ ticketId: ticket._id, type: "CREATED", actorName: author.name, to: "OPEN" });
+}
+
+/** Idempotent: wipes the app collections and re-creates the demo dataset. */
+export async function seedDatabase(data: SampleData, opts: { withDemoTickets?: boolean } = {}) {
+  await clearCollections();
 
   const [authorHash, adminHash] = await Promise.all([
     hashPassword(demoPasswords.author),
@@ -166,99 +298,18 @@ export async function seedDatabase(data: SampleData, opts: { withDemoTickets?: b
   ]);
 
   const admins = await User.insertMany(
-    demoAdmins.map((a) => ({ ...a, role: "ADMIN", passwordHash: adminHash })),
+    demoAdmins.map((admin) => ({ ...admin, role: "ADMIN", passwordHash: adminHash })),
   );
-
-  const authorIdByCode = new Map<string, string>();
-  const bookByCode = new Map<string, { id: string; title: string; isbn: string }>();
-
-  for (const a of data.authors) {
-    const user = await User.create({
-      email: a.email,
-      name: a.name,
-      role: "AUTHOR",
-      passwordHash: authorHash,
-      authorProfile: { code: a.author_id, phone: a.phone, city: a.city, joinedDate: new Date(a.joined_date) },
-    });
-    authorIdByCode.set(a.author_id, user._id.toString());
-
-    const books = await Book.insertMany(
-      a.books.map((b) => ({
-        code: b.book_id,
-        authorId: user._id,
-        title: b.title,
-        isbn: b.isbn,
-        genre: b.genre,
-        publicationDate: b.publication_date ? new Date(b.publication_date) : null,
-        status: b.status,
-        mrp: b.mrp,
-        royaltyPerCopy: b.author_royalty_per_copy,
-        copiesSold: b.total_copies_sold,
-        royalty: {
-          earned: b.total_royalty_earned,
-          paid: b.royalty_paid,
-          pending: b.royalty_pending,
-          lastPayoutDate: b.last_royalty_payout_date ? new Date(b.last_royalty_payout_date) : null,
-        },
-        printPartner: b.print_partner,
-        availableOn: b.available_on,
-      })),
-    );
-    for (const b of books) bookByCode.set(b.code, { id: b._id.toString(), title: b.title, isbn: b.isbn });
-  }
+  const { authorByCode, bookByCode } = await seedAuthorsAndBooks(data, authorHash);
 
   let ticketCount = 0;
   if (opts.withDemoTickets !== false) {
-    const admin = admins[0];
-    for (const t of demoTickets) {
-      const authorId = authorIdByCode.get(t.authorCode);
-      if (!authorId) continue;
-      const author = data.authors.find((a) => a.author_id === t.authorCode)!;
-      const book = t.bookCode ? bookByCode.get(t.bookCode) ?? null : null;
-      const createdAt = new Date(Date.now() - t.daysAgo * day - 2 * 60 * 60 * 1000);
-      const seq = await nextSequence("ticket");
-      const messages = t.reply
-        ? [
-            {
-              senderId: admin._id,
-              senderRole: "ADMIN",
-              senderName: admin.name,
-              body: t.reply,
-              aiAssisted: true,
-              createdAt: new Date(createdAt.getTime() + 3 * 60 * 60 * 1000),
-            },
-          ]
-        : [];
-      const ticket = await Ticket.create({
-        ticketNumber: `T-${seq}`,
-        authorId,
-        bookId: book?.id ?? null,
-        bookSnapshot: book ? { title: book.title, isbn: book.isbn } : null,
-        subject: t.subject,
-        description: t.description,
-        status: t.status,
-        category: t.category,
-        categorySource: "AI",
-        priority: t.priority,
-        prioritySource: "AI",
-        priorityRank: priorityRankByLevel[t.priority],
-        ai: {
-          status: "DONE",
-          confidence: 0.9,
-          reasoning: "Seeded demo ticket (pre-classified).",
-          model: "seed",
-          suggestedCategory: t.category,
-          suggestedPriority: t.priority,
-          attempts: 1,
-        },
-        assigneeId: t.status === "IN_PROGRESS" || t.status === "RESOLVED" ? admin._id : null,
-        messages,
-        firstResponseAt: messages[0]?.createdAt ?? null,
-        resolvedAt: t.status === "RESOLVED" ? new Date(createdAt.getTime() + 4 * 60 * 60 * 1000) : null,
-        createdAt,
-        updatedAt: messages[0]?.createdAt ?? createdAt,
-      });
-      await TicketEvent.create({ ticketId: ticket._id, type: "CREATED", actorName: author.name, to: "OPEN" });
+    // Sequential on purpose: ticket numbers come from a counter and should follow list order.
+    for (const demo of demoTickets) {
+      const author = authorByCode.get(demo.authorCode);
+      if (!author) continue;
+      const book = demo.bookCode ? (bookByCode.get(demo.bookCode) ?? null) : null;
+      await seedDemoTicket(demo, author, book, admins[0]);
       ticketCount++;
     }
   }

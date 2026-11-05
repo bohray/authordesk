@@ -7,36 +7,44 @@ import { getTicketStats } from "../repositories/ticket.repository";
 
 /** Ratios are rounded to 4 decimal places (0.1234 → 12.34%), enough for a percentage display. */
 const ratioScale = 10_000;
-const ratio = (num: number, den: number) => (den > 0 ? Math.round((num / den) * ratioScale) / ratioScale : 0);
+const ratio = (numerator: number, denominator: number) =>
+  denominator > 0 ? Math.round((numerator / denominator) * ratioScale) / ratioScale : 0;
+
+/** Bucket for open tickets the classifier hasn't labelled yet. */
+const unclassifiedKey = "UNCLASSIFIED";
+const emptyClassificationCounts = { classified: 0, rule: 0, suggested: 0, overridden: 0 };
+
+/** A zero count for every key, so the DTO has every key even when no ticket has that value. */
+function zeroCounts<K extends string>(keys: readonly K[]): Record<K, number> {
+  // Object.fromEntries loses the key type; every key is set above, so the cast is safe.
+  return Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
+}
 
 export async function getAdminStats(): Promise<AdminStatsDTO> {
-  const [t, usage] = await Promise.all([getTicketStats(), getAiUsageTotals()]);
+  const [ticketStats, usage] = await Promise.all([getTicketStats(), getAiUsageTotals()]);
 
-  // Start from zeroes so every key is present even when no ticket has that value.
-  const openByPriority = Object.fromEntries(
-    [...ticketPriorities, "UNCLASSIFIED"].map((k) => [k, 0]),
-  ) as AdminStatsDTO["openByPriority"];
-  for (const row of t.openByPriority) openByPriority[row._id ?? "UNCLASSIFIED"] += row.n;
+  const openByPriority = zeroCounts([...ticketPriorities, unclassifiedKey]);
+  for (const row of ticketStats.openByPriority) openByPriority[row._id ?? unclassifiedKey] += row.n;
 
-  const byStatus = Object.fromEntries(ticketStatuses.map((s) => [s, 0])) as AdminStatsDTO["byStatus"];
-  for (const row of t.byStatus) if (row._id in byStatus) byStatus[row._id] = row.n;
+  const byStatus = zeroCounts(ticketStatuses);
+  for (const row of ticketStats.byStatus) if (row._id in byStatus) byStatus[row._id] = row.n;
 
-  const c = t.classification[0] ?? { classified: 0, rule: 0, suggested: 0, overridden: 0 };
+  const classification = ticketStats.classification[0] ?? emptyClassificationCounts;
 
   return {
     openByPriority,
     byStatus,
-    unassigned: t.unassigned[0]?.n ?? 0,
-    oldestOpenAt: iso(t.oldestOpen[0]?.at ?? null),
+    unassigned: ticketStats.unassigned[0]?.n ?? 0,
+    oldestOpenAt: iso(ticketStats.oldestOpen[0]?.at ?? null),
     ai: {
       calls: usage.calls,
       failures: usage.failures,
       // Share of processed tickets that fell back to the rule-based classifier.
-      fallbackRate: ratio(c.rule, c.classified),
+      fallbackRate: ratio(classification.rule, classification.classified),
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       // Share of AI suggestions an admin later changed: a rough accuracy signal.
-      overrideRate: ratio(c.overridden, c.suggested),
+      overrideRate: ratio(classification.overridden, classification.suggested),
     },
   };
 }
