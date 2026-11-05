@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { LoadingRegion } from "@/components/common/Skeletons";
+import { aiHealthMetricCount, summaryMetricCount } from "@/constants/dashboard";
+import { ticketPriorities, ticketStatuses } from "@/shared/constants/ticket";
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 
@@ -35,24 +37,25 @@ function BarPanelSkeleton({ rows, className }: { rows: number; className?: strin
   );
 }
 
-/** Mirrors DashboardContent: 4 metrics, 3 panels (priority, status, AI health), quick links. */
+/** Mirrors DashboardContent: summary metrics, 3 panels (priority, status, AI health), quick links. */
 export function DashboardSkeleton() {
   return (
     <LoadingRegion label="Loading dashboard" className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {range(4).map((i) => (
+        {range(summaryMetricCount).map((i) => (
           <MetricSkeleton key={i} />
         ))}
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <BarPanelSkeleton rows={5} />
-        <BarPanelSkeleton rows={4} />
+        {/* Priority panel has an extra "Unclassified" row. */}
+        <BarPanelSkeleton rows={ticketPriorities.length + 1} />
+        <BarPanelSkeleton rows={ticketStatuses.length} />
         <Card size="sm" className="md:col-span-2 xl:col-span-1">
           <CardHeader>
             <Skeleton className="h-4 w-24" />
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-2">
-            {range(6).map((i) => (
+            {range(aiHealthMetricCount).map((i) => (
               <MetricSkeleton key={i} />
             ))}
           </CardContent>

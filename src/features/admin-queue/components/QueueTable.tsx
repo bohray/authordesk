@@ -1,5 +1,6 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, MessageSquare } from "lucide-react";
@@ -18,25 +19,124 @@ import { PriorityBadge } from "@/components/common/PriorityBadge";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Spinner } from "@/components/common/LoadingState";
 import { toneText } from "@/components/common/tones";
+import { classifyingLabel } from "@/constants/adminTicket";
+import { generalBookLabel, queueAssigneeLabels, queueColumns } from "@/constants/queue";
 import { routes } from "@/constants/routes";
 import { priorityRowClasses } from "@/constants/ui";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { queueColumns } from "@/features/admin-queue/components/queueLayout";
 import { unresolvedStatuses } from "@/shared/constants/ticket";
 import type { AdminTicketListItemDTO } from "@/shared/types/dto";
 
-function AiCell({ t }: { t: AdminTicketListItemDTO }) {
-  if (t.aiStatus === "PENDING") return <Spinner label="Classifying…" className="text-xs" />;
+/** Clicks on these inside a row keep their own behaviour instead of opening the ticket. */
+const rowClickExclusions = "a,button";
+
+function PriorityCell({ ticket }: { ticket: AdminTicketListItemDTO }) {
   return (
     <span className="inline-flex items-center gap-1">
-      <AiSourceBadge source={t.categorySource} />
-      {t.aiStatus === "FAILED" && (
+      <PriorityBadge priority={ticket.priority} />
+      {ticket.prioritySource === "ADMIN" && <AiSourceBadge source="ADMIN" />}
+    </span>
+  );
+}
+
+function TicketCell({ ticket, href }: { ticket: AdminTicketListItemDTO; href: string }) {
+  return (
+    <>
+      <Link href={href} className="group block focus-visible:outline-none">
+        <span className="font-mono text-xs text-muted-foreground">{ticket.ticketNumber}</span>
+        <span className="line-clamp-2 font-medium text-foreground group-hover:underline group-focus-visible:underline">
+          {ticket.subject}
+        </span>
+      </Link>
+      {ticket.messageCount > 0 && (
+        <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <MessageSquare className="size-3" aria-hidden />
+          {plural(ticket.messageCount, "message")}
+        </span>
+      )}
+    </>
+  );
+}
+
+function AssigneeCell({ assignee }: { assignee: AdminTicketListItemDTO["assignee"] }) {
+  if (assignee) return <span className="text-sm text-foreground">{assignee.name}</span>;
+  return (
+    <span className={cn("text-xs font-medium", toneText.attention)}>{queueAssigneeLabels.unassigned}</span>
+  );
+}
+
+function AiCell({ ticket }: { ticket: AdminTicketListItemDTO }) {
+  if (ticket.aiStatus === "PENDING") return <Spinner label={classifyingLabel} className="text-xs" />;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <AiSourceBadge source={ticket.categorySource} />
+      {ticket.aiStatus === "FAILED" && (
         <span title="AI classification failed, rule-based fallback used">
           <AlertTriangle className={cn("size-3.5", toneText.warn)} aria-label="AI failed" />
         </span>
       )}
     </span>
+  );
+}
+
+function QueueRow({
+  ticket,
+  onPrefetch,
+}: {
+  ticket: AdminTicketListItemDTO;
+  onPrefetch?: (ticketId: string) => void;
+}) {
+  const router = useRouter();
+  const unresolved = unresolvedStatuses.includes(ticket.status);
+  const emphasis = unresolved && ticket.priority ? priorityRowClasses[ticket.priority] : undefined;
+  const href = routes.admin.ticket(ticket.id);
+
+  // The whole row is a click target for mouse users; the subject link stays the keyboard path.
+  const handleClick = (e: MouseEvent<HTMLTableRowElement>) => {
+    if (e.target instanceof Element && e.target.closest(rowClickExclusions)) return;
+    router.push(href);
+  };
+  const handlePrefetch = onPrefetch && (() => onPrefetch(ticket.id));
+
+  return (
+    <TableRow
+      className={cn("cursor-pointer", emphasis, !unresolved && "text-muted-foreground")}
+      onClick={handleClick}
+      onMouseEnter={handlePrefetch}
+      onFocus={handlePrefetch}
+    >
+      <TableCell className="pl-4">
+        <PriorityCell ticket={ticket} />
+      </TableCell>
+      <TableCell className="max-w-80 min-w-56 whitespace-normal">
+        <TicketCell ticket={ticket} href={href} />
+      </TableCell>
+      <TableCell>
+        <div className="text-sm text-foreground">{ticket.author.name}</div>
+        <div className="max-w-44 truncate text-xs text-muted-foreground">{ticket.author.email}</div>
+      </TableCell>
+      <TableCell className="max-w-44">
+        <span className="block truncate" title={ticket.book?.title}>
+          {ticket.book?.title ?? <span className="text-muted-foreground">{generalBookLabel}</span>}
+        </span>
+      </TableCell>
+      <TableCell>
+        <CategoryBadge category={ticket.category} />
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={ticket.status} />
+      </TableCell>
+      <TableCell>
+        <AssigneeCell assignee={ticket.assignee} />
+      </TableCell>
+      <TableCell>
+        <AgeBadge createdAt={ticket.createdAt} status={ticket.status} />
+      </TableCell>
+      <TableCell className="pr-4">
+        <AiCell ticket={ticket} />
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -51,7 +151,6 @@ export function QueueTable({
   /** Called on row hover/focus to warm the detail query. */
   onPrefetch?: (ticketId: string) => void;
 }) {
-  const router = useRouter();
   return (
     <div
       className={cn(
@@ -74,75 +173,9 @@ export function QueueTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {tickets.map((t) => {
-            const unresolved = unresolvedStatuses.includes(t.status);
-            const emphasis = unresolved && t.priority ? priorityRowClasses[t.priority] : undefined;
-            const href = routes.admin.ticket(t.id);
-            return (
-              <TableRow
-                key={t.id}
-                className={cn("cursor-pointer", emphasis, !unresolved && "text-muted-foreground")}
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("a,button")) return;
-                  router.push(href);
-                }}
-                onMouseEnter={onPrefetch && (() => onPrefetch(t.id))}
-                onFocus={onPrefetch && (() => onPrefetch(t.id))}
-              >
-                <TableCell className="pl-4">
-                  <span className="inline-flex items-center gap-1">
-                    <PriorityBadge priority={t.priority} />
-                    {t.prioritySource === "ADMIN" && <AiSourceBadge source="ADMIN" />}
-                  </span>
-                </TableCell>
-                <TableCell className="max-w-80 min-w-56 whitespace-normal">
-                  <Link
-                    href={href}
-                    className="group block focus-visible:outline-none"
-                  >
-                    <span className="font-mono text-xs text-muted-foreground">{t.ticketNumber}</span>
-                    <span className="line-clamp-2 font-medium text-foreground group-hover:underline group-focus-visible:underline">
-                      {t.subject}
-                    </span>
-                  </Link>
-                  {t.messageCount > 0 && (
-                    <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <MessageSquare className="size-3" aria-hidden />
-                      {plural(t.messageCount, "message")}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm text-foreground">{t.author.name}</div>
-                  <div className="max-w-44 truncate text-xs text-muted-foreground">{t.author.email}</div>
-                </TableCell>
-                <TableCell className="max-w-44">
-                  <span className="block truncate" title={t.book?.title}>
-                    {t.book?.title ?? <span className="text-muted-foreground">General</span>}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <CategoryBadge category={t.category} />
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={t.status} />
-                </TableCell>
-                <TableCell>
-                  {t.assignee ? (
-                    <span className="text-sm text-foreground">{t.assignee.name}</span>
-                  ) : (
-                    <span className={cn("text-xs font-medium", toneText.attention)}>Unassigned</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <AgeBadge createdAt={t.createdAt} status={t.status} />
-                </TableCell>
-                <TableCell className="pr-4">
-                  <AiCell t={t} />
-                </TableCell>
-              </TableRow>
-            );
-          })}
+          {tickets.map((ticket) => (
+            <QueueRow key={ticket.id} ticket={ticket} onPrefetch={onPrefetch} />
+          ))}
         </TableBody>
       </Table>
     </div>

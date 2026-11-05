@@ -1,10 +1,22 @@
 import { Skeleton } from "@/components/ui/Skeleton";
 import { LoadingRegion, TableSkeleton } from "@/components/common/Skeletons";
 import { QueuePageHeader } from "@/features/admin-queue/components/QueuePageHeader";
-import { queueColumns, queueSkeletonRows } from "@/features/admin-queue/components/queueLayout";
+import {
+  filterControlClass,
+  queueColumns,
+  queueDateFilters,
+  queueSelectFilters,
+  queueSkeletonRows,
+  queueStatusPresets,
+} from "@/constants/queue";
+import { ticketPriorities, ticketStatuses } from "@/shared/constants/ticket";
 
-/** "Open" tile + 4 priority chips + "Unassigned" chip, same height as the real strip. */
-const statsChips = 6;
+/** "Open" tile + one chip per priority + "Unassigned" chip, same height as the real strip. */
+const statsChips = ticketPriorities.length + 2;
+/** "Status" label + presets + one chip per status. */
+const statusChips = 1 + queueStatusPresets.length + ticketStatuses.length;
+/** Select filters + date inputs + the Clear button. */
+const filterControls = queueSelectFilters.length + queueDateFilters.length + 1;
 
 export function QueueStatsSkeleton() {
   return (
@@ -20,17 +32,17 @@ export function QueueFiltersSkeleton() {
   return (
     <div className="mb-4 space-y-3 rounded-xl border bg-background p-3" aria-hidden>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Skeleton className="h-9 flex-1" />
-        <Skeleton className="h-9 sm:w-52" />
+        <Skeleton className={`${filterControlClass} flex-1`} />
+        <Skeleton className={`${filterControlClass} sm:w-52`} />
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {Array.from({ length: 7 }, (_, i) => (
+        {Array.from({ length: statusChips }, (_, i) => (
           <Skeleton key={i} className="h-7 w-20 rounded-full" />
         ))}
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_auto_auto_auto]">
-        {Array.from({ length: 6 }, (_, i) => (
-          <Skeleton key={i} className="h-9 xl:min-w-36" />
+        {Array.from({ length: filterControls }, (_, i) => (
+          <Skeleton key={i} className={`${filterControlClass} xl:min-w-36`} />
         ))}
       </div>
     </div>

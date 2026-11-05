@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, BookOpen, Loader2, UserMinus, UserPlus } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/Button";
+import { BookOpen, Loader2, UserMinus, UserPlus, type LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { SelectField } from "@/components/forms/SelectField";
 import { AgeBadge } from "@/components/common/AgeBadge";
@@ -12,48 +11,33 @@ import { PriorityBadge } from "@/components/common/PriorityBadge";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { toneText } from "@/components/common/tones";
-import { routes } from "@/constants/routes";
+import { closeTicketDialog, ticketStatusOptions, ticketUpdateMessages } from "@/constants/adminTicket";
+import { queueAssigneeLabels } from "@/constants/queue";
 import { bookLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useCurrentAdmin, useUpdateTicket } from "@/features/admin-ticket/hooks/useAdminTicket";
-import {
-  ticketStatuses,
-  ticketStatusLabels,
-  type TicketStatus,
-} from "@/shared/constants/ticket";
+import { BackToQueueLink } from "@/features/admin-ticket/components/BackToQueueLink";
+import { ticketStatuses, ticketStatusLabels, type TicketStatus } from "@/shared/constants/ticket";
 import type { AdminTicketDetailDTO } from "@/shared/types/dto";
 
-const statusOptions = ticketStatuses.map((s) => ({ value: s, label: ticketStatusLabels[s] }));
+type TicketUpdate = ReturnType<typeof useUpdateTicket>;
 
-export function TicketHeader({ ticket }: { ticket: AdminTicketDetailDTO }) {
-  const update = useUpdateTicket(ticket.id);
-  const { data: me } = useCurrentAdmin();
-  const [confirmClose, setConfirmClose] = useState(false);
+interface AssignAction {
+  variant: "outline" | "default";
+  Icon: LucideIcon;
+  label: string;
+  assigneeId: "me" | null;
+  successMessage: string;
+}
 
-  const changeStatus = (status: TicketStatus) => {
-    if (status === ticket.status) return;
-    if (status === "CLOSED") {
-      setConfirmClose(true);
-      return;
-    }
-    update.mutate({
-      patch: { status },
-      successMessage: `Status changed to ${ticketStatusLabels[status]}`,
-    });
-  };
+function isTicketStatus(value: string): value is TicketStatus {
+  return (ticketStatuses as readonly string[]).includes(value);
+}
 
-  const assignedToMe = !!ticket.assignee && !!me && ticket.assignee.id === me.id;
-  const pendingAssign = update.isPending && update.variables?.patch.assigneeId !== undefined;
-
+/** Ticket number, badges, subject and the author / book / opened byline. */
+function TicketSummary({ ticket }: { ticket: AdminTicketDetailDTO }) {
   return (
-    <header className="space-y-3">
-      <Link
-        href={routes.admin.tickets}
-        className={buttonVariants({ variant: "ghost", size: "sm", className: "-ml-2" })}
-      >
-        <ArrowLeft aria-hidden />
-        Queue
-      </Link>
+    <>
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span className="font-mono">{ticket.ticketNumber}</span>
         <StatusBadge status={ticket.status} />
@@ -73,6 +57,84 @@ export function TicketHeader({ ticket }: { ticket: AdminTicketDetailDTO }) {
           Opened <RelativeTime date={ticket.createdAt} />
         </span>
       </p>
+    </>
+  );
+}
+
+/** Current assignee plus a single assign / take over / unassign action. */
+function AssigneeControl({ ticket, update }: { ticket: AdminTicketDetailDTO; update: TicketUpdate }) {
+  const { data: me } = useCurrentAdmin();
+  const assignedToMe = !!ticket.assignee && !!me && ticket.assignee.id === me.id;
+  const pendingAssign = update.isPending && update.variables?.patch.assigneeId !== undefined;
+
+  const action: AssignAction = assignedToMe
+    ? {
+        variant: "outline",
+        Icon: UserMinus,
+        label: "Unassign",
+        assigneeId: null,
+        successMessage: ticketUpdateMessages.unassigned,
+      }
+    : {
+        variant: ticket.assignee ? "outline" : "default",
+        Icon: UserPlus,
+        label: ticket.assignee ? "Take over" : "Assign to me",
+        assigneeId: "me",
+        successMessage: ticketUpdateMessages.assigned,
+      };
+
+  const handleAction = () =>
+    update.mutate({ patch: { assigneeId: action.assigneeId }, successMessage: action.successMessage });
+
+  return (
+    <div className="space-y-1">
+      <span className="block text-xs font-medium text-muted-foreground">Assignee</span>
+      <div className="flex h-9 items-center gap-2">
+        <span className="text-sm">
+          {!ticket.assignee ? (
+            <span className={cn("font-medium", toneText.attention)}>{queueAssigneeLabels.unassigned}</span>
+          ) : assignedToMe ? (
+            "You"
+          ) : (
+            ticket.assignee.name
+          )}
+        </span>
+        <Button variant={action.variant} size="sm" disabled={update.isPending} onClick={handleAction}>
+          {pendingAssign ? <Loader2 className="animate-spin" aria-hidden /> : <action.Icon aria-hidden />}
+          {action.label}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function TicketHeader({ ticket }: { ticket: AdminTicketDetailDTO }) {
+  const update = useUpdateTicket(ticket.id);
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  const handleStatusChange = (value: string) => {
+    if (!isTicketStatus(value) || value === ticket.status) return;
+    // Closing locks the author out of replying, so it goes through a confirmation first.
+    if (value === "CLOSED") {
+      setConfirmClose(true);
+      return;
+    }
+    update.mutate({
+      patch: { status: value },
+      successMessage: ticketUpdateMessages.status(ticketStatusLabels[value]),
+    });
+  };
+
+  const closeTicket = () =>
+    update.mutate(
+      { patch: { status: "CLOSED" }, successMessage: ticketUpdateMessages.closed },
+      { onSettled: () => setConfirmClose(false) },
+    );
+
+  return (
+    <header className="space-y-3">
+      <BackToQueueLink />
+      <TicketSummary ticket={ticket} />
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-background p-3">
         <div className="space-y-1">
@@ -82,69 +144,24 @@ export function TicketHeader({ ticket }: { ticket: AdminTicketDetailDTO }) {
           <SelectField
             id="ticket-status"
             value={ticket.status}
-            onValueChange={(v) => changeStatus(v as TicketStatus)}
-            options={statusOptions}
+            onValueChange={handleStatusChange}
+            options={ticketStatusOptions}
             disabled={update.isPending}
             className="h-9 w-40"
           />
         </div>
-        <div className="space-y-1">
-          <span className="block text-xs font-medium text-muted-foreground">Assignee</span>
-          <div className="flex h-9 items-center gap-2">
-            <span className="text-sm">
-              {ticket.assignee ? (
-                assignedToMe ? (
-                  "You"
-                ) : (
-                  ticket.assignee.name
-                )
-              ) : (
-                <span className={cn("font-medium", toneText.attention)}>Unassigned</span>
-              )}
-            </span>
-            {assignedToMe ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={update.isPending}
-                onClick={() =>
-                  update.mutate({ patch: { assigneeId: null }, successMessage: "Ticket unassigned" })
-                }
-              >
-                {pendingAssign ? <Loader2 className="animate-spin" aria-hidden /> : <UserMinus aria-hidden />}
-                Unassign
-              </Button>
-            ) : (
-              <Button
-                variant={ticket.assignee ? "outline" : "default"}
-                size="sm"
-                disabled={update.isPending}
-                onClick={() =>
-                  update.mutate({ patch: { assigneeId: "me" }, successMessage: "Assigned to you" })
-                }
-              >
-                {pendingAssign ? <Loader2 className="animate-spin" aria-hidden /> : <UserPlus aria-hidden />}
-                {ticket.assignee ? "Take over" : "Assign to me"}
-              </Button>
-            )}
-          </div>
-        </div>
+        <AssigneeControl ticket={ticket} update={update} />
       </div>
 
       <LazyConfirmDialog
         open={confirmClose}
         onOpenChange={setConfirmClose}
-        title="Close this ticket?"
-        description="The author won't be able to reply to a closed ticket. Use Resolved if they might still follow up."
-        confirmLabel="Close ticket"
+        title={closeTicketDialog.title}
+        description={closeTicketDialog.description}
+        confirmLabel={closeTicketDialog.confirmLabel}
         destructive
         isPending={update.isPending}
-        onConfirm={() =>
-          update.mutate(
-            { patch: { status: "CLOSED" }, successMessage: "Ticket closed" },
-            { onSettled: () => setConfirmClose(false) },
-          )
-        }
+        onConfirm={closeTicket}
       />
     </header>
   );

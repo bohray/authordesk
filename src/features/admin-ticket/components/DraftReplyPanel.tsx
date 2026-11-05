@@ -1,27 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AlertTriangle,
-  CheckCheck,
-  Loader2,
-  Lock,
-  PenLine,
-  RefreshCw,
-  Send,
-  Sparkles,
-} from "lucide-react";
+import { AlertTriangle, Lock, Sparkles } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Label } from "@/components/ui/Label";
-import { Textarea } from "@/components/ui/Textarea";
 import { LazyConfirmDialog } from "@/components/common/LazyConfirmDialog";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { aiRing, toneCallout, toneText } from "@/components/common/tones";
+import { regenerateDraftDialog, replyComposerCopy, ticketUpdateMessages } from "@/constants/adminTicket";
 import { uiMessages } from "@/constants/messages";
-import { messageMax } from "@/constants/ui";
 import { getErrorMessage } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import {
@@ -31,7 +19,10 @@ import {
   useUpdateTicket,
 } from "@/features/admin-ticket/hooks/useAdminTicket";
 import { DraftEditorSkeleton } from "@/features/admin-ticket/components/AdminTicketSkeletons";
+import { ReplyActions } from "@/features/admin-ticket/components/ReplyActions";
+import { ReplyEditor } from "@/features/admin-ticket/components/ReplyEditor";
 import { createMessageSchema } from "@/shared/schemas/ticket.schema";
+import type { TicketStatus } from "@/shared/constants/ticket";
 import type { AdminTicketDetailDTO, DraftDTO } from "@/shared/types/dto";
 
 interface Composer {
@@ -45,6 +36,45 @@ interface Composer {
 function draftKey(d: DraftDTO | undefined): string | null {
   if (!d || d.status !== "READY" || !d.content) return null;
   return `${d.generatedAt ?? ""}|${d.content.length}`;
+}
+
+function ClosedReplyNotice() {
+  return (
+    <Card size="sm">
+      <CardContent>
+        <Alert className="bg-muted/50">
+          <Lock aria-hidden />
+          <AlertDescription>{replyComposerCopy.closedNotice}</AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Explains what sending does, plus when the draft was generated if the text came from it. */
+function ReplyHint({
+  fromDraft,
+  status,
+  generatedAt,
+}: {
+  fromDraft: boolean;
+  status: TicketStatus;
+  generatedAt: string | null | undefined;
+}) {
+  if (!fromDraft) {
+    return status === "OPEN" ? replyComposerCopy.hintOpenTicket : replyComposerCopy.hintDefault;
+  }
+  return (
+    <>
+      {replyComposerCopy.hintFromDraft}
+      {generatedAt && (
+        <>
+          {" "}
+          Drafted <RelativeTime date={generatedAt} />.
+        </>
+      )}
+    </>
+  );
 }
 
 export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
@@ -74,8 +104,17 @@ export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
       : null;
 
   const loadingDraft = draftQuery.isPending && draftQuery.fetchStatus === "fetching";
+  const waitingForDraft = loadingDraft && !manual;
   const isEdited = composer.fromDraft && !!draft?.content && composer.text !== draft.content;
+  const hasUnsavedManualText = !composer.fromDraft && !!composer.text.trim();
   const busy = send.isPending || update.isPending;
+  const sendDisabled = busy || waitingForDraft || !composer.text.trim();
+
+  const regenerateLabel = regenerate.isPending
+    ? "Regenerating…"
+    : unavailableMessage
+      ? "Try AI again"
+      : "Regenerate";
 
   const applyDraft = (d: DraftDTO) => {
     const k = draftKey(d);
@@ -90,9 +129,14 @@ export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
     regenerate.mutate(undefined, { onSuccess: applyDraft });
   };
 
-  const onRegenerate = () => {
-    if (isEdited || (!composer.fromDraft && composer.text.trim())) setConfirmRegenerate(true);
+  // Regenerating overwrites the editor, so ask first if it holds the admin's own words.
+  const handleRegenerate = () => {
+    if (isEdited || hasUnsavedManualText) setConfirmRegenerate(true);
     else doRegenerate();
+  };
+
+  const handleUseDraft = () => {
+    if (draft) applyDraft(draft);
   };
 
   const writeManually = () => {
@@ -101,39 +145,35 @@ export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
     setComposer({ text: "", fromDraft: false, seededKey: key });
   };
 
-  const submit = async (resolve: boolean) => {
+  const handleTextChange = (text: string) => {
+    setError(null);
+    setComposer((c) => ({ ...c, text, fromDraft: c.fromDraft && text.trim() !== "" }));
+  };
+
+  const submit = async ({ resolve }: { resolve: boolean }) => {
     const parsed = createMessageSchema.safeParse({ body: composer.text });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Message cannot be empty");
+      setError(parsed.error.issues[0]?.message ?? replyComposerCopy.emptyError);
       return;
     }
     setError(null);
     try {
       await send.mutateAsync({ body: parsed.data.body, aiAssisted: composer.fromDraft });
+      // seededKey stays on the current draft so the seeding check doesn't refill the editor.
       setComposer({ text: "", fromDraft: false, seededKey: key });
       setManual(true);
       if (resolve) {
-        update.mutate({ patch: { status: "RESOLVED" }, successMessage: "Ticket marked resolved" });
+        update.mutate({ patch: { status: "RESOLVED" }, successMessage: ticketUpdateMessages.resolved });
       }
     } catch {
       // toast handled in the mutation
     }
   };
 
-  if (closed) {
-    return (
-      <Card size="sm">
-        <CardContent>
-          <Alert className="bg-muted/50">
-            <Lock aria-hidden />
-            <AlertDescription>
-              This ticket is closed. Reopen it (set status to Open or In Progress) to reply.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
+  const sendReply = () => void submit({ resolve: false });
+  const sendAndResolve = () => void submit({ resolve: true });
+
+  if (closed) return <ClosedReplyNotice />;
 
   return (
     <Card size="sm" className={aiRing}>
@@ -149,7 +189,7 @@ export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
               className={toneCallout.aiBadge}
               title={draft.model ? `Model: ${draft.model}` : undefined}
             >
-              {draft.cached ? "AI draft · cached" : "AI draft · freshly generated"}
+              {draft.cached ? replyComposerCopy.badgeCached : replyComposerCopy.badgeFresh}
             </Badge>
           )}
           {isEdited && (
@@ -163,129 +203,60 @@ export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
         {unavailableMessage && (
           <Alert className={toneCallout.warn}>
             <AlertTriangle aria-hidden />
-            <AlertTitle>AI draft unavailable</AlertTitle>
+            <AlertTitle>{replyComposerCopy.unavailableTitle}</AlertTitle>
             <AlertDescription className={toneCallout.warnBody}>
-              {unavailableMessage} You can write a manual reply below.
+              {unavailableMessage} {replyComposerCopy.unavailableSuffix}
             </AlertDescription>
           </Alert>
         )}
 
-        {loadingDraft && !manual ? (
+        {waitingForDraft ? (
           <DraftEditorSkeleton message={uiMessages.draft.loading} />
         ) : (
-          <div className="space-y-1.5">
-            <Label htmlFor="admin-reply" className="sr-only">
-              Reply message
-            </Label>
-            <Textarea
-              id="admin-reply"
-              rows={8}
-              maxLength={messageMax}
-              className="min-h-40"
-              value={composer.text}
-              disabled={busy || regenerate.isPending}
-              placeholder={
-                unavailableMessage || manual
-                  ? "Write your reply to the author…"
-                  : "The AI draft will appear here."
-              }
-              aria-invalid={!!error || undefined}
-              aria-describedby={error ? "admin-reply-error" : "admin-reply-hint"}
-              onChange={(e) => {
-                const text = e.target.value;
-                setError(null);
-                setComposer((c) => ({ ...c, text, fromDraft: c.fromDraft && text.trim() !== "" }));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit(false);
-              }}
-            />
-            {error ? (
-              <p id="admin-reply-error" role="alert" className="text-xs text-destructive">
-                {error}
-              </p>
-            ) : (
-              <p id="admin-reply-hint" className="text-xs text-muted-foreground">
-                {composer.fromDraft
-                  ? "Review and edit before sending. Check facts like dates and amounts against the book card."
-                  : ticket.status === "OPEN"
-                    ? "Sending a reply moves the ticket to In Progress."
-                    : "The author sees this reply immediately."}
-                {draft?.generatedAt && composer.fromDraft && (
-                  <>
-                    {" "}
-                    Drafted <RelativeTime date={draft.generatedAt} />.
-                  </>
-                )}
-              </p>
-            )}
-          </div>
+          <ReplyEditor
+            value={composer.text}
+            disabled={busy || regenerate.isPending}
+            placeholder={
+              unavailableMessage || manual
+                ? replyComposerCopy.manualPlaceholder
+                : replyComposerCopy.draftPlaceholder
+            }
+            error={error}
+            hint={
+              <ReplyHint
+                fromDraft={composer.fromDraft}
+                status={ticket.status}
+                generatedAt={draft?.generatedAt}
+              />
+            }
+            onChange={handleTextChange}
+            onSubmitShortcut={sendReply}
+          />
         )}
 
-        <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onRegenerate}
-              disabled={regenerate.isPending || loadingDraft || busy}
-            >
-              <RefreshCw className={regenerate.isPending ? "animate-spin" : undefined} aria-hidden />
-              {regenerate.isPending ? "Regenerating…" : unavailableMessage ? "Try AI again" : "Regenerate"}
-            </Button>
-            {manual && key ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => draft && applyDraft(draft)}
-                disabled={busy}
-              >
-                <Sparkles aria-hidden />
-                Use AI draft
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={writeManually}
-                disabled={busy || (manual && !composer.text)}
-              >
-                <PenLine aria-hidden />
-                Write manually
-              </Button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2 sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void submit(true)}
-              disabled={busy || (loadingDraft && !manual) || !composer.text.trim()}
-            >
-              <CheckCheck aria-hidden />
-              Send &amp; resolve
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void submit(false)}
-              disabled={busy || (loadingDraft && !manual) || !composer.text.trim()}
-            >
-              {send.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
-              {send.isPending ? "Sending…" : "Send reply"}
-            </Button>
-          </div>
-        </div>
+        <ReplyActions
+          regenerating={regenerate.isPending}
+          regenerateLabel={regenerateLabel}
+          regenerateDisabled={regenerate.isPending || loadingDraft || busy}
+          onRegenerate={handleRegenerate}
+          showUseDraft={manual && !!key}
+          onUseDraft={handleUseDraft}
+          onWriteManually={writeManually}
+          draftToggleDisabled={busy}
+          writeManuallyDisabled={manual && !composer.text}
+          sending={send.isPending}
+          sendDisabled={sendDisabled}
+          onSend={sendReply}
+          onSendAndResolve={sendAndResolve}
+        />
       </CardContent>
 
       <LazyConfirmDialog
         open={confirmRegenerate}
         onOpenChange={setConfirmRegenerate}
-        title="Replace your edits?"
-        description="Regenerating replaces the text in the editor with a new AI draft."
-        confirmLabel="Regenerate"
+        title={regenerateDraftDialog.title}
+        description={regenerateDraftDialog.description}
+        confirmLabel={regenerateDraftDialog.confirmLabel}
         onConfirm={doRegenerate}
       />
     </Card>

@@ -6,6 +6,9 @@ import { Currency } from "@/components/common/Currency";
 import { formatDate, formatNumber } from "@/lib/format";
 import type { AdminTicketDetailDTO } from "@/shared/types/dto";
 
+/** Shown for profile fields the author hasn't filled in. */
+const missingValue = "—";
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 py-1 text-sm">
@@ -39,11 +42,11 @@ export function AuthorContextCard({ ticket }: { ticket: AdminTicketDetailDTO }) 
                 <span className="font-mono">{p.code}</span>
               </Row>
               {p.phone && <Row label="Phone">{p.phone}</Row>}
-              <Row label="City">{p.city || "—"}</Row>
+              <Row label="City">{p.city || missingValue}</Row>
               <Row label="Joined">{formatDate(p.joinedDate)}</Row>
             </>
           ) : (
-            <Row label="Profile">—</Row>
+            <Row label="Profile">{missingValue}</Row>
           )}
         </dl>
       </CardContent>

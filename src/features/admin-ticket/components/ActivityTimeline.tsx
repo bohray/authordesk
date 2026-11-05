@@ -1,19 +1,9 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
-import {
-  ArrowRightLeft,
-  CirclePlus,
-  History,
-  MessageSquare,
-  Sparkles,
-  StickyNote,
-  Tag,
-  Flag,
-  UserCheck,
-} from "lucide-react";
+import { History, type LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { ticketEventIcons } from "@/constants/adminTicket";
 import {
   ticketCategoryLabels,
   ticketPriorityLabels,
@@ -22,18 +12,8 @@ import {
 } from "@/shared/constants/ticket";
 import type { TicketEventDTO } from "@/shared/types/dto";
 
-const icons = {
-  CREATED: CirclePlus,
-  STATUS_CHANGED: ArrowRightLeft,
-  CATEGORY_CHANGED: Tag,
-  PRIORITY_CHANGED: Flag,
-  ASSIGNED: UserCheck,
-  AI_CLASSIFIED: Sparkles,
-  REPLIED: MessageSquare,
-  NOTE_ADDED: StickyNote,
-} satisfies Record<TicketEventType, LucideIcon>;
-
-const labels: Record<string, string> = {
+/** Every enum label the timeline may need to print, keyed by raw value. */
+const enumLabels: Record<string, string> = {
   ...ticketStatusLabels,
   ...ticketCategoryLabels,
   ...ticketPriorityLabels,
@@ -44,7 +24,7 @@ function label(value: string | null): string {
   if (!value) return "none";
   return value
     .split(/[/,|]/)
-    .map((part) => labels[part.trim()] ?? part.trim())
+    .map((part) => enumLabels[part.trim()] ?? part.trim())
     .join(" · ");
 }
 
@@ -88,7 +68,8 @@ export function ActivityTimeline({ events }: { events: TicketEventDTO[] }) {
         ) : (
           <ol className="relative space-y-3 border-l pl-4">
             {sorted.map((e) => {
-              const Icon: LucideIcon = icons[e.type] ?? History;
+              // Fallback covers an event type newer than this client bundle.
+              const Icon: LucideIcon = ticketEventIcons[e.type] ?? History;
               return (
                 <li key={e.id} className="relative">
                   <span className="absolute top-0.5 -left-[25px] flex size-4.5 items-center justify-center rounded-full border bg-background">

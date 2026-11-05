@@ -5,15 +5,15 @@
  */
 import {
   queueSorts,
-  ticketCategories,
-  ticketCategoryLabels,
-  ticketPriorities,
-  ticketPriorityLabels,
   unresolvedStatuses,
   type QueueAssignee,
   type QueueSort,
+  type TicketPriority,
   type TicketStatus,
 } from "@/shared/constants/ticket";
+import { ticketCategoryOptions, ticketPriorityOptions } from "@/constants/adminTicket";
+import { uiMessages } from "@/constants/messages";
+import { routes } from "@/constants/routes";
 import type { AdminQueueQuery } from "@/types/queue";
 
 export interface FilterOption {
@@ -66,18 +66,12 @@ export const queueSelectFilters: {
   {
     key: "category",
     label: "Category",
-    options: withAny(
-      "All categories",
-      ticketCategories.map((c) => ({ value: c, label: ticketCategoryLabels[c] })),
-    ),
+    options: withAny("All categories", ticketCategoryOptions),
   },
   {
     key: "priority",
     label: "Priority",
-    options: withAny(
-      "All priorities",
-      ticketPriorities.map((p) => ({ value: p, label: ticketPriorityLabels[p] })),
-    ),
+    options: withAny("All priorities", ticketPriorityOptions),
   },
   {
     key: "assignee",
@@ -117,3 +111,51 @@ export const queueFilterFields = [
   "from",
   "to",
 ] as const satisfies readonly (keyof AdminQueueQuery)[];
+
+/** Column headers shared by QueueTable and its skeleton so they can't drift apart. */
+export const queueColumns = [
+  "Priority",
+  "Ticket",
+  "Author",
+  "Book",
+  "Category",
+  "Status",
+  "Assignee",
+  "Age",
+  "AI",
+] as const;
+
+/** Rows shown while the first page loads (the real page size is larger, but this fills the fold). */
+export const queueSkeletonRows = 8;
+
+/** Fallback shown in the Book column for account-level tickets. */
+export const generalBookLabel = "General";
+
+/** Empty-state copy for the queue, with and without active filters. */
+export const queueEmptyCopy = {
+  filtered: {
+    title: uiMessages.queue.emptyBody,
+    description: "Try widening the filters or clearing the search.",
+  },
+  unfiltered: {
+    title: uiMessages.queue.emptyTitle,
+    description: "No unresolved tickets right now. New tickets will appear here automatically.",
+  },
+} as const;
+
+/** Single-value queue filters that other pages can deep-link to. */
+export interface QueueLinkParams {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  assignee?: QueueAssignee;
+  sort?: QueueSort;
+}
+
+/** Queue URL with the given filters applied (same params `useQueueFilters` reads). */
+export function queueHref(params: QueueLinkParams): string {
+  const defined = Object.entries(params).filter(
+    (entry): entry is [string, string] => entry[1] !== undefined,
+  );
+  const qs = new URLSearchParams(defined).toString();
+  return qs ? `${routes.admin.tickets}?${qs}` : routes.admin.tickets;
+}

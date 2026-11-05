@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { UpdatingIndicator } from "@/components/common/LoadingState";
 import { Pagination } from "@/components/common/Pagination";
-import { uiMessages } from "@/constants/messages";
+import { queueEmptyCopy } from "@/constants/queue";
 import { useQueueFilters } from "@/features/admin-queue/hooks/useQueueFilters";
 import { useAdminTickets, usePrefetchAdminTicket } from "@/features/admin-queue/hooks/useAdminQueue";
 import { QueueFilters } from "@/features/admin-queue/components/QueueFilters";
@@ -29,6 +29,8 @@ export function TicketQueue() {
     setResetKey((k) => k + 1);
     reset();
   };
+  const handlePageChange = (page: number) => setFilters({ page });
+  const emptyCopy = isFiltered ? queueEmptyCopy.filtered : queueEmptyCopy.unfiltered;
 
   return (
     <>
@@ -53,12 +55,8 @@ export function TicketQueue() {
       ) : data.data.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          title={isFiltered ? uiMessages.queue.emptyBody : uiMessages.queue.emptyTitle}
-          description={
-            isFiltered
-              ? "Try widening the filters or clearing the search."
-              : "No unresolved tickets right now. New tickets will appear here automatically."
-          }
+          title={emptyCopy.title}
+          description={emptyCopy.description}
           action={
             isFiltered ? (
               <Button variant="outline" onClick={handleReset}>
@@ -78,7 +76,7 @@ export function TicketQueue() {
             totalPages={data.meta.totalPages}
             total={data.meta.total}
             limit={data.meta.limit}
-            onPageChange={(page) => setFilters({ page })}
+            onPageChange={handlePageChange}
           />
         </>
       )}
