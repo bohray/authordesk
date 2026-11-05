@@ -1,6 +1,9 @@
 import { z } from "zod";
 import {
+  DEFAULT_QUEUE_SORT,
   GENERAL_BOOK_OPTION,
+  QUEUE_ASSIGNEE_FILTERS,
+  QUEUE_SORTS,
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
   TICKET_STATUSES,
@@ -66,12 +69,12 @@ export const adminTicketQuerySchema = z.object({
   status: csvEnum(TICKET_STATUSES),
   category: csvEnum(TICKET_CATEGORIES),
   priority: csvEnum(TICKET_PRIORITIES),
-  assignee: z.union([z.literal("me"), z.literal("unassigned"), objectId]).optional(),
+  assignee: z.union([z.enum(QUEUE_ASSIGNEE_FILTERS), objectId]).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   q: z.string().trim().max(100).optional(),
   /** urgency = priority desc then oldest first (default); newest / oldest = by createdAt */
-  sort: z.enum(["urgency", "newest", "oldest"]).default("urgency"),
+  sort: z.enum(QUEUE_SORTS).default(DEFAULT_QUEUE_SORT),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });

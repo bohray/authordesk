@@ -8,41 +8,23 @@ import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/forms/select-field";
 import { useDebounce } from "@/hooks/use-debounce";
 import { SEARCH_DEBOUNCE_MS } from "@/constants/ui";
-import { cn } from "@/lib/utils";
-import { DEFAULT_QUEUE_STATUS, sameSet } from "@/features/admin-queue/hooks/use-queue-filters";
 import {
-  TICKET_CATEGORIES,
-  TICKET_CATEGORY_LABELS,
-  TICKET_PRIORITIES,
-  TICKET_PRIORITY_LABELS,
+  ANY_FILTER_VALUE,
+  FILTER_CONTROL_CLASS,
+  QUEUE_DATE_FILTERS,
+  QUEUE_SELECT_FILTERS,
+  QUEUE_SORT_OPTIONS,
+  QUEUE_STATUS_PRESETS,
+} from "@/constants/queue";
+import { sameSet } from "@/features/admin-queue/hooks/use-queue-filters";
+import { FilterChip } from "@/features/admin-queue/components/filter-chip";
+import {
+  DEFAULT_QUEUE_SORT,
   TICKET_STATUSES,
   TICKET_STATUS_LABELS,
-  type TicketCategory,
-  type TicketPriority,
   type TicketStatus,
 } from "@/shared/constants/ticket";
-import type { AdminQueueQuery, QueueAssignee, QueueSort } from "@/types/queue";
-
-const ANY = "any";
-
-const CATEGORY_OPTIONS = [
-  { value: ANY, label: "All categories" },
-  ...TICKET_CATEGORIES.map((c) => ({ value: c, label: TICKET_CATEGORY_LABELS[c] })),
-];
-const PRIORITY_OPTIONS = [
-  { value: ANY, label: "All priorities" },
-  ...TICKET_PRIORITIES.map((p) => ({ value: p, label: TICKET_PRIORITY_LABELS[p] })),
-];
-const ASSIGNEE_OPTIONS = [
-  { value: ANY, label: "Anyone" },
-  { value: "me", label: "Assigned to me" },
-  { value: "unassigned", label: "Unassigned" },
-];
-const SORT_OPTIONS = [
-  { value: "urgency", label: "Most urgent" },
-  { value: "newest", label: "Newest" },
-  { value: "oldest", label: "Oldest" },
-];
+import type { AdminQueueQuery, QueueSort } from "@/types/queue";
 
 /** Search box with local state; pushes to the URL once typing settles. */
 function SearchBox({ initial, onSearch }: { initial: string; onSearch: (q: string) => void }) {
@@ -68,7 +50,7 @@ function SearchBox({ initial, onSearch }: { initial: string; onSearch: (q: strin
         onChange={(e) => setValue(e.target.value)}
         placeholder="Search ticket #, subject, author or book…"
         aria-label="Search tickets"
-        className="h-9 pl-8"
+        className={`${FILTER_CONTROL_CLASS} pl-8`}
       />
     </div>
   );
@@ -87,22 +69,13 @@ export function QueueFilters({
   isFiltered: boolean;
   resetKey: number;
 }) {
+  const allSelected = query.status.length === 0;
+
   const toggleStatus = (s: TicketStatus) => {
-    const has = query.status.includes(s);
-    const next = has ? query.status.filter((x) => x !== s) : [...query.status, s];
-    // Deselecting the last status means "all" rather than "nothing".
+    const next = query.status.includes(s) ? query.status.filter((x) => x !== s) : [...query.status, s];
+    // Keep canonical order; deselecting the last status means "all" rather than "nothing".
     onChange({ status: TICKET_STATUSES.filter((x) => next.includes(x)) });
   };
-  const allSelected = query.status.length === 0;
-  const unresolvedOnly = sameSet(query.status, DEFAULT_QUEUE_STATUS);
-
-  const chip = (active: boolean) =>
-    cn(
-      "inline-flex h-7 items-center rounded-full border px-3 text-xs font-medium whitespace-nowrap interactive pressable focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-      active
-        ? "border-primary bg-primary text-primary-foreground"
-        : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
-    );
 
   return (
     <div className="mb-4 space-y-3 rounded-xl border bg-background p-3">
@@ -116,100 +89,74 @@ export function QueueFilters({
             id="queue-sort"
             value={query.sort}
             onValueChange={(v) => onChange({ sort: v as QueueSort })}
-            options={SORT_OPTIONS}
-            className="h-9 sm:w-40"
+            options={QUEUE_SORT_OPTIONS}
+            className={`${FILTER_CONTROL_CLASS} sm:w-40`}
           />
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Status filter">
         <span className="mr-1 text-xs text-muted-foreground">Status</span>
-        <button
-          type="button"
-          className={chip(unresolvedOnly)}
-          aria-pressed={unresolvedOnly}
-          onClick={() => onChange({ status: [...DEFAULT_QUEUE_STATUS] })}
-        >
-          Unresolved
-        </button>
-        <button
-          type="button"
-          className={chip(allSelected)}
-          aria-pressed={allSelected}
-          onClick={() => onChange({ status: [] })}
-        >
-          All
-        </button>
+        {QUEUE_STATUS_PRESETS.map((preset) => (
+          <FilterChip
+            key={preset.label}
+            active={sameSet(query.status, preset.status)}
+            onClick={() => onChange({ status: [...preset.status] })}
+          >
+            {preset.label}
+          </FilterChip>
+        ))}
         <span className="mx-1 h-4 w-px bg-border" aria-hidden />
-        {TICKET_STATUSES.map((s) => {
-          const active = !allSelected && query.status.includes(s);
-          return (
-            <button
-              key={s}
-              type="button"
-              className={chip(active)}
-              aria-pressed={active}
-              onClick={() => toggleStatus(s)}
-            >
-              {TICKET_STATUS_LABELS[s]}
-            </button>
-          );
-        })}
+        {TICKET_STATUSES.map((s) => (
+          <FilterChip
+            key={s}
+            active={!allSelected && query.status.includes(s)}
+            onClick={() => toggleStatus(s)}
+          >
+            {TICKET_STATUS_LABELS[s]}
+          </FilterChip>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_auto_auto_auto]">
-        <SelectField
-          value={query.category ?? ANY}
-          onValueChange={(v) => onChange({ category: v === ANY ? null : (v as TicketCategory) })}
-          options={CATEGORY_OPTIONS}
-          ariaLabel="Category"
-          className="h-9"
-        />
-        <SelectField
-          value={query.priority ?? ANY}
-          onValueChange={(v) => onChange({ priority: v === ANY ? null : (v as TicketPriority) })}
-          options={PRIORITY_OPTIONS}
-          ariaLabel="Priority"
-          className="h-9"
-        />
-        <SelectField
-          value={query.assignee ?? ANY}
-          onValueChange={(v) => onChange({ assignee: v === ANY ? null : (v as QueueAssignee) })}
-          options={ASSIGNEE_OPTIONS}
-          ariaLabel="Assignee"
-          className="h-9"
-        />
-        <div className="flex items-center gap-1.5">
-          <Label htmlFor="queue-from" className="shrink-0 text-xs text-muted-foreground">
-            From
-          </Label>
-          <Input
-            id="queue-from"
-            type="date"
-            value={query.from ?? ""}
-            max={query.to ?? undefined}
-            onChange={(e) => onChange({ from: e.target.value || null })}
-            className="h-9"
+        {QUEUE_SELECT_FILTERS.map((filter) => (
+          <SelectField
+            key={filter.key}
+            value={query[filter.key] ?? ANY_FILTER_VALUE}
+            // Options are generated from the shared enums, so the value is always valid for its key.
+            onValueChange={(v) =>
+              onChange({ [filter.key]: v === ANY_FILTER_VALUE ? null : v } as Partial<AdminQueueQuery>)
+            }
+            options={filter.options}
+            ariaLabel={filter.label}
+            className={FILTER_CONTROL_CLASS}
           />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Label htmlFor="queue-to" className="shrink-0 text-xs text-muted-foreground">
-            To
-          </Label>
-          <Input
-            id="queue-to"
-            type="date"
-            value={query.to ?? ""}
-            min={query.from ?? undefined}
-            onChange={(e) => onChange({ to: e.target.value || null })}
-            className="h-9"
-          />
-        </div>
+        ))}
+        {QUEUE_DATE_FILTERS.map((filter) => {
+          const id = `queue-${filter.key}`;
+          const bound = query[filter.bound.key] ?? undefined;
+          return (
+            <div key={filter.key} className="flex items-center gap-1.5">
+              <Label htmlFor={id} className="shrink-0 text-xs text-muted-foreground">
+                {filter.label}
+              </Label>
+              <Input
+                id={id}
+                type="date"
+                value={query[filter.key] ?? ""}
+                min={filter.bound.attr === "min" ? bound : undefined}
+                max={filter.bound.attr === "max" ? bound : undefined}
+                onChange={(e) => onChange({ [filter.key]: e.target.value || null })}
+                className={FILTER_CONTROL_CLASS}
+              />
+            </div>
+          );
+        })}
         <Button
           variant="ghost"
           onClick={onReset}
-          disabled={!isFiltered && query.sort === "urgency"}
-          className="h-9"
+          disabled={!isFiltered && query.sort === DEFAULT_QUEUE_SORT}
+          className={FILTER_CONTROL_CLASS}
         >
           <X aria-hidden />
           Clear

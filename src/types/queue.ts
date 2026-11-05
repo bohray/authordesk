@@ -1,7 +1,13 @@
-import type { TicketCategory, TicketPriority, TicketStatus } from "@/shared/constants/ticket";
+import type {
+  QueueAssignee,
+  QueueSort,
+  TicketCategory,
+  TicketPriority,
+  TicketStatus,
+} from "@/shared/constants/ticket";
 
-export type QueueSort = "urgency" | "newest" | "oldest";
-export type QueueAssignee = "me" | "unassigned";
+// Single source of truth lives in shared constants (also used by the API schema).
+export type { QueueAssignee, QueueSort };
 
 /** Normalised admin queue filters, derived from (and written back to) the URL. */
 export interface AdminQueueQuery {

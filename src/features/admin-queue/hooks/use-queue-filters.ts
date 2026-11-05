@@ -3,19 +3,20 @@
 import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  DEFAULT_QUEUE_SORT,
+  QUEUE_ASSIGNEE_FILTERS,
+  QUEUE_SORTS,
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
   TICKET_STATUSES,
-  UNRESOLVED_STATUSES,
   type TicketCategory,
   type TicketPriority,
   type TicketStatus,
 } from "@/shared/constants/ticket";
+import { ALL_STATUSES_PARAM, DEFAULT_QUEUE_STATUS, QUEUE_FILTER_FIELDS } from "@/constants/queue";
 import type { AdminQueueQuery, QueueAssignee, QueueSort } from "@/types/queue";
 
-const ALL = "ALL";
-const DEFAULT_STATUS: TicketStatus[] = [...UNRESOLVED_STATUSES];
-const SORTS: QueueSort[] = ["urgency", "newest", "oldest"];
+const DEFAULT_STATUS: TicketStatus[] = [...DEFAULT_QUEUE_STATUS];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function oneOf<T extends string>(value: string | null, allowed: readonly T[]): T | null {
@@ -31,7 +32,7 @@ export function parseQueueQuery(sp: URLSearchParams | { get(name: string): strin
   const status =
     rawStatus === null
       ? DEFAULT_STATUS
-      : rawStatus === ALL
+      : rawStatus === ALL_STATUSES_PARAM
         ? []
         : rawStatus
             .split(",")
@@ -40,21 +41,21 @@ export function parseQueueQuery(sp: URLSearchParams | { get(name: string): strin
   const from = sp.get("from");
   const to = sp.get("to");
   return {
-    status: rawStatus !== null && rawStatus !== ALL && status.length === 0 ? DEFAULT_STATUS : status,
+    status: rawStatus !== null && rawStatus !== ALL_STATUSES_PARAM && status.length === 0 ? DEFAULT_STATUS : status,
     category: oneOf<TicketCategory>(sp.get("category"), TICKET_CATEGORIES),
     priority: oneOf<TicketPriority>(sp.get("priority"), TICKET_PRIORITIES),
-    assignee: oneOf<QueueAssignee>(sp.get("assignee"), ["me", "unassigned"]),
+    assignee: oneOf<QueueAssignee>(sp.get("assignee"), QUEUE_ASSIGNEE_FILTERS),
     from: from && DATE_RE.test(from) ? from : null,
     to: to && DATE_RE.test(to) ? to : null,
     q: sp.get("q") ?? "",
-    sort: oneOf<QueueSort>(sp.get("sort"), SORTS) ?? "urgency",
+    sort: oneOf<QueueSort>(sp.get("sort"), QUEUE_SORTS) ?? DEFAULT_QUEUE_SORT,
     page: Number.isFinite(page) && page > 0 ? page : 1,
   };
 }
 
 export function serializeQueueQuery(q: AdminQueueQuery): string {
   const sp = new URLSearchParams();
-  if (q.status.length === 0) sp.set("status", ALL);
+  if (q.status.length === 0) sp.set("status", ALL_STATUSES_PARAM);
   else if (!sameSet(q.status, DEFAULT_STATUS)) sp.set("status", q.status.join(","));
   if (q.category) sp.set("category", q.category);
   if (q.priority) sp.set("priority", q.priority);
@@ -62,12 +63,10 @@ export function serializeQueueQuery(q: AdminQueueQuery): string {
   if (q.from) sp.set("from", q.from);
   if (q.to) sp.set("to", q.to);
   if (q.q.trim()) sp.set("q", q.q.trim());
-  if (q.sort !== "urgency") sp.set("sort", q.sort);
+  if (q.sort !== DEFAULT_QUEUE_SORT) sp.set("sort", q.sort);
   if (q.page > 1) sp.set("page", String(q.page));
   return sp.toString();
 }
-
-export const DEFAULT_QUEUE_STATUS = DEFAULT_STATUS;
 
 /** Queue filters live in the URL so views are shareable and survive refresh/back. */
 export function useQueueFilters() {
@@ -95,12 +94,8 @@ export function useQueueFilters() {
 
   const isFiltered =
     !sameSet(query.status, DEFAULT_STATUS) ||
-    !!query.category ||
-    !!query.priority ||
-    !!query.assignee ||
-    !!query.from ||
-    !!query.to ||
-    !!query.q.trim();
+    !!query.q.trim() ||
+    QUEUE_FILTER_FIELDS.some((field) => query[field] !== null);
 
   return { query, setFilters, reset, isFiltered };
 }

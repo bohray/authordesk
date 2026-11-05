@@ -72,5 +72,14 @@ export const TICKET_EVENT_TYPES = [
 ] as const;
 export type TicketEventType = (typeof TICKET_EVENT_TYPES)[number];
 
+/** Admin queue sort orders. urgency = unresolved first, priority desc, then oldest first. */
+export const QUEUE_SORTS = ["urgency", "newest", "oldest"] as const;
+export type QueueSort = (typeof QUEUE_SORTS)[number];
+export const DEFAULT_QUEUE_SORT: QueueSort = "urgency";
+
+/** Admin queue assignee filter values (besides "anyone", which is the absence of a filter). */
+export const QUEUE_ASSIGNEE_FILTERS = ["me", "unassigned"] as const;
+export type QueueAssignee = (typeof QUEUE_ASSIGNEE_FILTERS)[number];
+
 /** Value used by the "which book" dropdown for account-level queries. */
 export const GENERAL_BOOK_OPTION = "GENERAL";
