@@ -24,7 +24,7 @@ This is a 4-day take-home assignment. The portal has two sides: authors raise su
 | Auth | Custom **JWT (`jose`) in an httpOnly cookie** + bcryptjs; `middleware.ts` guards pages; `withApi()` wrapper guards API routes | Simple email/password, as the brief asks; easy to explain line by line |
 | Real-time | **Smart polling**: TanStack Query polls a lightweight `GET /api/v1/updates?since=<ISO>` every 5s while the tab is visible (paused when hidden, refetch on focus). It returns only the IDs and `updatedAt` of changed tickets, then refetches only what changed | Vercel is serverless: no in-memory event bus, and long-lived SSE connections hit function time limits. Polling a tiny delta endpoint is reliable and cheap, and feels instant at 5s. Upgrade path: SSE backed by Mongo change streams on a persistent host |
 | Background AI work | `after()` from `next/server` (runs via `waitUntil` on Vercel) | Ticket returns 201 at once; classification runs after the response inside the same invocation |
-| AI primary | **Google Gemini free tier** (`@google/genai`): `gemini-2.5-flash-lite` classifies, `gemini-2.5-flash` drafts (model IDs in env) | Free, JSON-schema structured output |
+| AI primary | **Google Gemini free tier** (`@google/genai`): `gemini-3.5-flash-lite` classifies, `gemini-3.5-flash` drafts (model IDs in env) | Free, JSON-schema structured output |
 | AI secondary | **Groq free tier** (Llama 3.x), optional | Used when Gemini is rate-limited |
 | AI last resort | Local keyword rule classifier + manual reply | App works with zero AI |
 | API docs | OpenAPI 3 generated from Zod (`@asteasolutions/zod-to-openapi`), served at `/api/v1/openapi.json` + Swagger UI at `/docs` | Docs can't drift from the code |

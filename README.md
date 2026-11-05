@@ -133,7 +133,7 @@ src/
 | Cost | Category-scoped KB retrieval instead of the whole KB. Drafts **cached** per ticket and regenerated only on request or when the thread changes. Smallest model for classification. Output token caps. Every call logged with tokens and latency, shown on the admin dashboard. |
 | Failure handling | 10s timeout, exponential backoff on 429/5xx, Gemini → Groq fallback, a circuit breaker per provider, then a deterministic rule classifier. Tickets are always created, and admins can always reply manually. |
 | Security | Keys only in server env (never `NEXT_PUBLIC_`). Author text is delimited and treated as data (prompt-injection guard). |
-| Model choice | Gemini 2.5 Flash-Lite / Flash on the **free tier**: reviewers can reproduce it at no cost, it supports native JSON schema output, and quality is good for short support replies. The `LLMProvider` interface makes switching to a paid Claude or OpenAI model a single-file change. |
+| Model choice | Gemini 3.5 Flash-Lite / Flash on the **free tier**: reviewers can reproduce it at no cost, it supports native JSON schema output, and quality is good for short support replies. The `LLMProvider` interface makes switching to a paid Claude or OpenAI model a single-file change. |
 
 ---
 

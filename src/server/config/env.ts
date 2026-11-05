@@ -14,8 +14,8 @@ const envSchema = z.object({
 
   // AI: all optional. Without keys the app degrades to rule-based classification + manual replies.
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_CLASSIFY_MODEL: z.string().default("gemini-2.5-flash-lite"),
-  GEMINI_DRAFT_MODEL: z.string().default("gemini-2.5-flash"),
+  GEMINI_CLASSIFY_MODEL: z.string().default("gemini-3.5-flash-lite"),
+  GEMINI_DRAFT_MODEL: z.string().default("gemini-3.5-flash"),
   GROQ_API_KEY: z.string().optional(),
   GROQ_MODEL: z.string().default("llama-3.1-8b-instant"),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),

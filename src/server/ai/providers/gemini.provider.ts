@@ -1,5 +1,5 @@
 import "server-only";
-import { ApiError, GoogleGenAI } from "@google/genai";
+import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { env } from "@/server/config/env";
 import {
   LLMError,
@@ -55,7 +55,9 @@ export class GeminiProvider implements LLMProvider {
           temperature: req.temperature,
           // Thinking tokens are billed as output and count against maxOutputTokens; for
           // classification and short replies they add cost/latency without measurable gain.
-          thinkingConfig: { thinkingBudget: 0 },
+          // Gemini 3.x uses `thinkingLevel` (MINIMAL ≈ no thoughts); the 2.5-era
+          // `thinkingBudget: 0` is rejected with 400 by gemini-3.5-flash-lite.
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
           ...(req.responseFormat === "json"
             ? { responseMimeType: "application/json", responseJsonSchema: req.jsonSchema }
             : {}),

@@ -116,7 +116,7 @@ If a ticket has not been classified yet, the drafter picks KB sections using the
 
 | Control | Effect |
 |---|---|
-| Small model (`gemini-2.5-flash-lite`) for classification, larger model (`gemini-2.5-flash`) only for drafts | Cheapest model for the high-volume call |
+| Small model (`gemini-3.5-flash-lite`) for classification, larger model (`gemini-3.5-flash`) only for drafts | Cheapest model for the high-volume call |
 | `thinkingBudget: 0` | Thinking tokens are billed as output and count against `maxOutputTokens`. They add no value for triage or short replies |
 | `maxOutputTokens` 200 / 600, temperature 0 / 0.4 | Bounded output; classification is deterministic |
 | Only the category's KB sections, cut description, last 4 messages × 800 characters | Input stays roughly flat as threads grow |
