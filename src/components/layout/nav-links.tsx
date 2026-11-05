@@ -22,25 +22,28 @@ export function NavLinks({ items, label }: { items: NavItem[]; label: string }) 
     return item.exact ? pathname === item.href : pathname.startsWith(item.href);
   };
   return (
-    <nav aria-label={label}>
-      <ul className="flex items-center gap-1 overflow-x-auto">
+    <nav aria-label={label} className="h-full">
+      <ul className="flex h-full items-stretch gap-1 overflow-x-auto [scrollbar-width:none]">
         {items.map((item) => {
           const active = isActive(item);
           const Icon = item.icon;
           return (
-            <li key={item.href}>
+            <li key={item.href} className="flex">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
+                  "group/nav relative inline-flex items-center gap-1.5 px-2.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none",
+                  "after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:transition-colors",
                   active
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                    ? "text-primary after:bg-primary"
+                    : "text-muted-foreground after:bg-transparent hover:text-foreground hover:after:bg-border",
                 )}
               >
-                <Icon className="size-4" aria-hidden />
-                {item.label}
+                <span className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 group-focus-visible/nav:ring-2 group-focus-visible/nav:ring-ring/50">
+                  <Icon className="size-4" aria-hidden />
+                  {item.label}
+                </span>
               </Link>
             </li>
           );

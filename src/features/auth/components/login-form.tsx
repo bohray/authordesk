@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, BookOpenText, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,11 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { FormField, describedBy } from "@/components/forms/form-field";
 import { DemoAccounts } from "@/features/auth/components/demo-accounts";
+import { Wordmark } from "@/components/brand/logo";
 import { useLogin } from "@/features/auth/hooks/use-auth-mutations";
 import { getErrorMessage, getFieldErrors } from "@/lib/api-client";
 import { homeForRole } from "@/constants/routes";
 import { MESSAGES } from "@/constants/messages";
-import { APP_NAME } from "@/constants/ui";
 import { loginSchema, type LoginInput } from "@/shared/schemas/auth.schema";
 import type { Role } from "@/shared/constants/roles";
 
@@ -64,15 +64,12 @@ export function LoginForm() {
 
   return (
     <div className="w-full max-w-md space-y-6">
-      <div className="flex items-center justify-center gap-2 text-lg font-semibold">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <BookOpenText className="size-4" aria-hidden />
-        </span>
-        {APP_NAME}
+      <div className="flex justify-center lg:hidden">
+        <Wordmark textClassName="text-xl" />
       </div>
-      <Card>
+      <Card className="shadow-lg shadow-primary/5 dark:shadow-none">
         <CardHeader>
-          <CardTitle className="text-lg">{MESSAGES.login.title}</CardTitle>
+          <CardTitle className="text-2xl">{MESSAGES.login.title}</CardTitle>
           <CardDescription>{MESSAGES.login.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">

@@ -68,11 +68,14 @@ export function DemoAccounts({
                 onClick={() => onPick(a)}
                 aria-pressed={selected}
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-lg border bg-background px-3 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-                  selected && "border-primary/40 bg-muted/60",
+                  "flex w-full items-start gap-3 rounded-lg border bg-background px-3 py-2 text-left transition-colors hover:border-primary/25 hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                  selected && "border-primary/40 bg-primary/5 ring-1 ring-primary/20 dark:bg-primary/10",
                 )}
               >
-                <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <Icon
+                  className={cn("mt-0.5 size-4 shrink-0 text-muted-foreground", selected && "text-primary")}
+                  aria-hidden
+                />
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
                     {a.label}

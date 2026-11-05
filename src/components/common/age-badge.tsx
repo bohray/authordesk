@@ -24,10 +24,10 @@ export function AgeBadge({
   const tone = !unresolved
     ? "bg-muted text-muted-foreground"
     : hours > AGE_DANGER_HOURS
-      ? "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200"
+      ? "bg-red-50 text-red-800 ring-1 ring-inset ring-red-600/25 dark:bg-red-500/15 dark:text-red-200 dark:ring-red-400/35"
       : hours > AGE_WARN_HOURS
-        ? "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200"
-        : "bg-muted text-foreground";
+        ? "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/25 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-400/25"
+        : "bg-muted text-foreground ring-1 ring-inset ring-border";
   return (
     <Badge
       variant="outline"
