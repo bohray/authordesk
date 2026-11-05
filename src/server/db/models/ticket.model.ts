@@ -76,8 +76,9 @@ ticketSchema.index({ status: 1, priorityRank: -1, createdAt: 1 });
 ticketSchema.index({ authorId: 1, createdAt: -1 });
 ticketSchema.index({ assigneeId: 1, status: 1 });
 ticketSchema.index({ category: 1 });
-// Polling delta endpoint.
+// Polling delta endpoint (admins: all tickets; authors: own tickets only).
 ticketSchema.index({ updatedAt: 1 });
+ticketSchema.index({ authorId: 1, updatedAt: 1 });
 
 export type TicketDoc = InferSchemaType<typeof ticketSchema> & { _id: Types.ObjectId };
 export const Ticket: Model<InferSchemaType<typeof ticketSchema>> =
