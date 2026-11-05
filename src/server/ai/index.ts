@@ -6,9 +6,16 @@ import "server-only";
  *  - Never throws to callers. Failures are recorded on the ticket / returned as UNAVAILABLE.
  *  - Never blocks ticket creation: callers run `classifyTicket` inside `after()`.
  *
- * TEMPORARY STUB: replaced by the AI-layer implementation.
+ * Implementation map:
+ *  - classifier.service.ts  AI classification with rule-engine fallback
+ *  - drafter.service.ts     cached, KB-grounded reply drafts
+ *  - llm-client.ts          timeout / retry / provider fallback / circuit breaker / usage logging
+ *  - context/build-facts.ts all numbers & dates computed in code (never by the model)
  */
 import type { DraftDTO } from "@/shared/types/dto";
+import { classifyTicketImpl } from "./classifier.service";
+import { getDraftForTicketImpl } from "./drafter.service";
+import { hasConfiguredProvider } from "./llm-client";
 
 /**
  * Classify a ticket's category + priority and persist the result on the ticket
@@ -16,7 +23,11 @@ import type { DraftDTO } from "@/shared/types/dto";
  * Skips silently if the ticket was already classified by an admin override.
  */
 export async function classifyTicket(ticketId: string): Promise<void> {
-  void ticketId;
+  try {
+    await classifyTicketImpl(ticketId);
+  } catch {
+    // classifyTicketImpl already guards itself; this is belt-and-braces for the contract.
+  }
 }
 
 /**
@@ -27,14 +38,29 @@ export async function getDraftForTicket(
   ticketId: string,
   opts: { regenerate?: boolean } = {},
 ): Promise<DraftDTO> {
-  void ticketId;
-  void opts;
-  return {
-    content: null,
-    status: "UNAVAILABLE",
-    model: null,
-    generatedAt: null,
-    cached: false,
-    message: "AI drafting is not configured yet.",
-  };
+  try {
+    return await getDraftForTicketImpl(ticketId, opts);
+  } catch {
+    return {
+      content: null,
+      status: "UNAVAILABLE",
+      model: null,
+      generatedAt: null,
+      cached: false,
+      message: "AI drafting is temporarily unavailable. Please write a reply manually.",
+    };
+  }
 }
+
+/** True when at least one LLM provider has an API key (UI can hide the "Draft" button otherwise). */
+export function isAiConfigured(): boolean {
+  try {
+    return hasConfiguredProvider();
+  } catch {
+    return false;
+  }
+}
+
+/** Shared payout schedule maths (quarter end + 45 days), e.g. for MyBooksDTO.nextPayoutDate. */
+export { getNextPayoutDate } from "./context/build-facts";
+export { PAYOUT_THRESHOLD_INR } from "./knowledge-base/publisher";
