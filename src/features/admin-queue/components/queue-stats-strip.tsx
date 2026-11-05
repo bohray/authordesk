@@ -45,7 +45,7 @@ export function QueueStatsStrip({
 
   const chip = (active: boolean) =>
     cn(
-      "flex min-w-24 flex-1 flex-col items-start gap-0.5 rounded-lg border bg-background px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+      "flex min-w-24 flex-1 flex-col items-start gap-0.5 rounded-lg border bg-background px-3 py-2 text-left interactive pressable hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
       active && "border-primary/50 bg-muted/60",
     );
 

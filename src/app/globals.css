@@ -168,6 +168,11 @@
   body {
     @apply bg-background text-foreground transition-colors;
   }
+  /* Tailwind v4 dropped the pointer cursor on buttons; restore it app-wide. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
   ::selection {
     background-color: var(--selection);
   }
@@ -182,6 +187,34 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
     border-radius: calc(var(--radius) * 0.6);
+  }
+}
+
+/*
+ * Interaction feel, shared by every clickable control.
+ * `interactive`: pointer cursor + a 200ms ease-out transition. 200ms (not 250+) keeps
+ *   hover colour changes feeling instant rather than sluggish.
+ * `pressable`: tactile 2% press. Tailwind v4 / modern CSS animate the standalone
+ *   `scale` property (not `transform`), so it must be listed in the transition. Skipped
+ *   for disabled controls and for users who prefer reduced motion.
+ */
+@utility interactive {
+  cursor: pointer;
+  transition-property:
+    color, background-color, border-color, outline-color, text-decoration-color, fill, stroke,
+    box-shadow, opacity, scale, translate, transform;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@utility pressable {
+  &:active:not(:disabled, [aria-disabled="true"], [data-disabled]) {
+    scale: 0.98;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:active {
+      scale: none;
+    }
   }
 }
 
