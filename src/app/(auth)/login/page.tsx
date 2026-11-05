@@ -17,27 +17,39 @@ const POINTS = [
 export default function LoginPage() {
   return (
     <main className="grid min-h-dvh flex-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <aside className="paper-texture relative hidden flex-col justify-between overflow-hidden border-r p-10 lg:flex xl:p-14">
-        <Wordmark textClassName="text-2xl" markClassName="size-9" />
-        <div className="max-w-lg space-y-6">
-          <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+      {/*
+        Ruled-paper panel. `paper-texture` draws a rule every 28px from the top, so every
+        size, line-height and gap below is a multiple of 28px (one "row") and blocks are
+        stacked from the top (no justify-between / centering, whose offsets depend on the
+        viewport height). That keeps each line of text sitting in its own ruled row.
+      */}
+      <aside className="paper-texture relative hidden flex-col overflow-hidden border-r px-10 py-[56px] lg:flex xl:px-14">
+        <Wordmark
+          className="h-[28px] gap-3"
+          textClassName="text-2xl leading-[28px]"
+          markClassName="size-[28px]"
+        />
+        <div className="mt-[168px] max-w-lg xl:mt-[224px]">
+          <p className="text-xs leading-[28px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">
             Author support portal
           </p>
-          <p className="font-heading text-4xl leading-[1.1] font-semibold tracking-tight text-balance xl:text-5xl">
+          <p className="mt-[28px] font-heading text-4xl leading-[56px] font-semibold tracking-tight text-balance xl:text-5xl">
             Support for every author, <span className="text-primary italic">at scale.</span>
           </p>
-          <ul className="space-y-3 text-sm text-muted-foreground">
+          <ul className="mt-[56px] flex flex-col gap-[28px] text-sm leading-[28px] text-muted-foreground">
             {POINTS.map(({ Icon, text }) => (
-              <li key={text} className="flex items-center gap-3">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-card text-primary shadow-card ring-1 ring-border">
+              <li key={text} className="flex h-[28px] items-center gap-3">
+                <span className="flex size-[28px] shrink-0 items-center justify-center rounded-md bg-card text-primary shadow-card ring-1 ring-border">
                   <Icon className="size-3.5" aria-hidden />
                 </span>
                 {text}
               </li>
             ))}
           </ul>
+          <p className="mt-[112px] text-xs leading-[28px] text-muted-foreground">
+            Every manuscript deserves a good reply.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">Every manuscript deserves a good reply.</p>
       </aside>
 
       <section className="relative flex min-w-0 flex-col">
