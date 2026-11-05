@@ -1,10 +1,11 @@
 import { AlertTriangle, Info, CircleDashed } from "lucide-react";
+import { TONE_TEXT } from "@/components/common/tones";
 import { cn } from "@/lib/utils";
 import type { NoteTone, RoyaltyNote } from "@/features/books/utils/royalty";
 
 const STYLES: Record<NoteTone, { cls: string; Icon: typeof Info }> = {
-  info: { cls: "text-sky-700", Icon: Info },
-  warn: { cls: "text-amber-700", Icon: AlertTriangle },
+  info: { cls: TONE_TEXT.info, Icon: Info },
+  warn: { cls: TONE_TEXT.warn, Icon: AlertTriangle },
   muted: { cls: "text-muted-foreground", Icon: CircleDashed },
 };
 

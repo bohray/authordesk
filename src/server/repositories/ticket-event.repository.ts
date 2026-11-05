@@ -1,10 +1,7 @@
 import "server-only";
-import type { Types } from "mongoose";
 import type { TicketEventType } from "@/shared/constants/ticket";
 import { TicketEvent } from "../db/models";
-import type { TicketEventRecord } from "./types";
-
-type Id = string | Types.ObjectId;
+import type { Id, TicketEventRecord } from "./types";
 
 export interface NewTicketEvent {
   ticketId: Id;

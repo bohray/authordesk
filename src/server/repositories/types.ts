@@ -10,6 +10,9 @@ import type {
   TicketStatus,
 } from "@/shared/constants/ticket";
 
+/** Ids accepted by repository functions: a hex string from the API or an ObjectId from a record. */
+export type Id = string | Types.ObjectId;
+
 /**
  * Plain (lean) record shapes returned by repositories. Declared explicitly instead of
  * relying on Mongoose's inferred document types so services and mappers work with

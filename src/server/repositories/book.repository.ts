@@ -1,9 +1,6 @@
 import "server-only";
-import type { Types } from "mongoose";
 import { Book } from "../db/models";
-import type { BookRecord } from "./types";
-
-type Id = string | Types.ObjectId;
+import type { Id, BookRecord } from "./types";
 
 export function findBooksByAuthor(authorId: Id) {
   return Book.find({ authorId }).lean<BookRecord[]>();

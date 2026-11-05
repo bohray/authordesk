@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft, FileText, Paperclip } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
@@ -7,25 +8,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConversationThread } from "@/components/common/conversation-thread";
 import { EmptyState } from "@/components/common/empty-state";
 import { ErrorState } from "@/components/common/error-state";
-import { DetailSkeleton } from "@/components/common/loading-state";
 import { ROUTES } from "@/constants/routes";
 import { MESSAGES } from "@/constants/messages";
 import { formatBytes, formatDateTime } from "@/lib/format";
-import { isApiError } from "@/lib/api-client";
+import { isNotFoundError } from "@/lib/api-client";
 import { useAdminTicket } from "@/features/admin-ticket/hooks/use-admin-ticket";
 import { TicketHeader } from "@/features/admin-ticket/components/ticket-header";
 import { DraftReplyPanel } from "@/features/admin-ticket/components/draft-reply-panel";
 import { ClassificationCard } from "@/features/admin-ticket/components/classification-card";
 import { AuthorContextCard, BookDetailsCard } from "@/features/admin-ticket/components/context-cards";
-import { InternalNotes } from "@/features/admin-ticket/components/internal-notes";
-import { ActivityTimeline } from "@/features/admin-ticket/components/activity-timeline";
+import {
+  AdminTicketSkeleton,
+  NotesSkeleton,
+  TimelineSkeleton,
+} from "@/features/admin-ticket/components/admin-ticket-skeletons";
+
+// Side-panel widgets are below the fold on most screens and pull in extra code (the notes
+// form brings react-hook-form + its resolver), so they load in separate chunks. The thread,
+// header and draft panel stay in the main bundle because they're the critical path.
+const InternalNotes = dynamic(
+  () => import("@/features/admin-ticket/components/internal-notes").then((m) => m.InternalNotes),
+  { loading: () => <NotesSkeleton /> },
+);
+const ActivityTimeline = dynamic(
+  () => import("@/features/admin-ticket/components/activity-timeline").then((m) => m.ActivityTimeline),
+  { loading: () => <TimelineSkeleton /> },
+);
 
 export function AdminTicketView({ ticketId }: { ticketId: string }) {
   const { data: ticket, isPending, isError, error, refetch, isRefetching } = useAdminTicket(ticketId);
 
-  if (isPending) return <DetailSkeleton />;
+  if (isPending) return <AdminTicketSkeleton />;
   if (isError) {
-    const notFound = isApiError(error) && [400, 404, 422].includes(error.status);
+    const notFound = isNotFoundError(error);
     return (
       <div className="space-y-3">
         <Link

@@ -1,7 +1,15 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { queryKeys } from "@/constants/query-keys";
+import { QUERY_STALE_MS } from "@/lib/query-client";
 import { authorTicketsApi } from "@/features/tickets/api";
 import type { CreateTicketInput } from "@/shared/schemas/ticket.schema";
 
@@ -13,18 +21,30 @@ export function useMyTickets(page: number, limit: number) {
   });
 }
 
-export function useMyTicket(ticketId: string) {
-  return useQuery({
+const ticketQuery = (ticketId: string) =>
+  queryOptions({
     queryKey: queryKeys.authorTickets.detail(ticketId),
     queryFn: ({ signal }) => authorTicketsApi.get(ticketId, signal),
   });
+
+export function useMyTicket(ticketId: string) {
+  return useQuery(ticketQuery(ticketId));
+}
+
+/** Warms a ticket's detail on hover/focus so opening it renders instantly. */
+export function usePrefetchMyTicket() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (ticketId: string) => void queryClient.prefetchQuery(ticketQuery(ticketId)),
+    [queryClient],
+  );
 }
 
 export function useBookOptions() {
   return useQuery({
     queryKey: queryKeys.books.mine(),
     queryFn: ({ signal }) => authorTicketsApi.books(signal),
-    staleTime: 5 * 60_000,
+    staleTime: QUERY_STALE_MS.long,
   });
 }
 

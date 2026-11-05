@@ -37,13 +37,17 @@ import {
   updateTicket,
 } from "../repositories/ticket.repository";
 import type { TicketRecord } from "../repositories/types";
-import { findAdminById, findUserById, findUsersByIds } from "../repositories/user.repository";
+import {
+  findAdminById,
+  findUserById,
+  findUsersByIds,
+  findUsersWithProfileByIds,
+} from "../repositories/user.repository";
 import { runAfterResponse } from "./background";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** A PENDING classification older than this is assumed lost (e.g. the function was killed). */
 const STALE_CLASSIFICATION_MS = 2 * 60 * 1000;
-const CLOSED_MESSAGE = "This ticket is closed. Please open a new ticket.";
 
 const isUnresolved = (s: TicketStatus) => UNRESOLVED_STATUSES.includes(s);
 
@@ -91,16 +95,18 @@ export async function listQueue(
 // ---------------------------------------------------------------------------
 
 async function buildDetail(ticket: TicketRecord): Promise<AdminTicketDetailDTO> {
-  const [author, assignee, book, notes, events] = await Promise.all([
-    findUserById(ticket.authorId),
-    ticket.assigneeId ? findUserById(ticket.assigneeId) : Promise.resolve(null),
+  // Author and assignee come from one batched, projected query; everything runs in parallel.
+  const userIds = ticket.assigneeId ? [ticket.authorId, ticket.assigneeId] : [ticket.authorId];
+  const [users, book, notes, events] = await Promise.all([
+    findUsersWithProfileByIds(userIds),
     ticket.bookId ? findBookById(ticket.bookId) : Promise.resolve(null),
     listNotesForTicket(ticket._id),
     listEventsForTicket(ticket._id),
   ]);
+  const byId = new Map(users.map((u) => [u._id.toString(), u]));
   return toAdminTicketDetailDTO(ticket, {
-    author,
-    assignee,
+    author: byId.get(ticket.authorId.toString()) ?? null,
+    assignee: ticket.assigneeId ? (byId.get(ticket.assigneeId.toString()) ?? null) : null,
     book: book ? toBookDTO(book) : null,
     notes,
     events,
@@ -170,17 +176,17 @@ export async function updateTicketAsAdmin(
     const nextId = input.assigneeId === "me" ? session.userId : input.assigneeId;
     const currentId = ticket.assigneeId?.toString() ?? null;
     if (nextId !== currentId) {
-      let nextName: string | null = null;
-      if (nextId) {
-        const admin = await findAdminById(nextId);
-        if (!admin) {
-          throw Errors.validation([
-            { in: "body", path: "assigneeId", message: "Assignee must be an existing admin" },
-          ]);
-        }
-        nextName = admin.name;
+      // Both lookups are independent, so run them together instead of back to back.
+      const [admin, current] = await Promise.all([
+        nextId ? findAdminById(nextId) : Promise.resolve(null),
+        currentId ? findUserById(currentId) : Promise.resolve(null),
+      ]);
+      if (nextId && !admin) {
+        throw Errors.validation([
+          { in: "body", path: "assigneeId", message: "Assignee must be an existing admin" },
+        ]);
       }
-      const current = currentId ? await findUserById(currentId) : null;
+      const nextName = admin?.name ?? null;
       set.assigneeId = nextId ? new Types.ObjectId(nextId) : null;
       // Names (not ids) so the timeline reads naturally without extra lookups.
       event("ASSIGNED", current?.name ?? null, nextName);
@@ -205,7 +211,7 @@ export async function replyAsAdmin(
   input: CreateMessageInput,
 ): Promise<AdminTicketDetailDTO> {
   const ticket = await loadTicket(ticketId);
-  if (ticket.status === "CLOSED") throw Errors.conflict(CLOSED_MESSAGE);
+  if (ticket.status === "CLOSED") throw Errors.ticketClosed();
 
   const now = new Date();
   const set: Record<string, unknown> = {};
@@ -242,7 +248,7 @@ export async function replyAsAdmin(
     },
     { status: { $ne: "CLOSED" } },
   );
-  if (!updated) throw Errors.conflict(CLOSED_MESSAGE);
+  if (!updated) throw Errors.ticketClosed();
   await recordEvents(events);
   return buildDetail(updated);
 }
@@ -279,7 +285,8 @@ export async function getDraft(ticketId: string, regenerate = false): Promise<Dr
 }
 
 export async function retryClassification(ticketId: string): Promise<AdminTicketDetailDTO> {
-  await loadTicket(ticketId);
+  // Cheap existence check first; the full document is read once, after classification.
+  if (!(await ticketExists(ticketId))) throw Errors.notFound("Ticket");
   await classifyTicket(ticketId); // never throws; failures are recorded on the ticket
   return buildDetail(await loadTicket(ticketId));
 }

@@ -3,15 +3,16 @@
 import { useState } from "react";
 import { Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { ErrorState } from "@/components/common/error-state";
-import { ListSkeleton } from "@/components/common/loading-state";
+import { UpdatingIndicator } from "@/components/common/loading-state";
 import { Pagination } from "@/components/common/pagination";
 import { MESSAGES } from "@/constants/messages";
 import { useQueueFilters } from "@/features/admin-queue/hooks/use-queue-filters";
-import { useAdminTickets } from "@/features/admin-queue/hooks/use-admin-queue";
+import { useAdminTickets, usePrefetchAdminTicket } from "@/features/admin-queue/hooks/use-admin-queue";
 import { QueueFilters } from "@/features/admin-queue/components/queue-filters";
+import { QueuePageHeader } from "@/features/admin-queue/components/queue-page-header";
+import { QueueTableSkeleton } from "@/features/admin-queue/components/queue-skeletons";
 import { QueueStatsStrip } from "@/features/admin-queue/components/queue-stats-strip";
 import { QueueTable } from "@/features/admin-queue/components/queue-table";
 
@@ -20,6 +21,9 @@ export function TicketQueue() {
   const [resetKey, setResetKey] = useState(0);
   const { data, isPending, isError, error, refetch, isRefetching, isPlaceholderData, isFetching } =
     useAdminTickets(query);
+  const prefetch = usePrefetchAdminTicket();
+  // Only true while showing the previous filter's rows; background polls don't dim the table.
+  const isUpdating = isPlaceholderData && isFetching;
 
   const handleReset = () => {
     setResetKey((k) => k + 1);
@@ -28,10 +32,7 @@ export function TicketQueue() {
 
   return (
     <>
-      <PageHeader
-        title="Ticket Queue"
-        description="Unresolved tickets first, highest priority and oldest at the top."
-      />
+      <QueuePageHeader />
       <QueueStatsStrip query={query} onFilter={setFilters} />
       <QueueFilters
         query={query}
@@ -41,7 +42,7 @@ export function TicketQueue() {
         resetKey={resetKey}
       />
       {isPending ? (
-        <ListSkeleton rows={8} />
+        <QueueTableSkeleton />
       ) : isError ? (
         <ErrorState
           title="Couldn't load the queue"
@@ -68,7 +69,10 @@ export function TicketQueue() {
         />
       ) : (
         <>
-          <QueueTable tickets={data.data} isFetching={isPlaceholderData && isFetching} />
+          <div className="mb-1 flex h-5 justify-end">
+            <UpdatingIndicator active={isUpdating} />
+          </div>
+          <QueueTable tickets={data.data} isFetching={isUpdating} onPrefetch={prefetch} />
           <Pagination
             page={data.meta.page}
             totalPages={data.meta.totalPages}

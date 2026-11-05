@@ -16,19 +16,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { LazyConfirmDialog } from "@/components/common/lazy-confirm-dialog";
 import { RelativeTime } from "@/components/common/relative-time";
+import { AI_RING, TONE_CALLOUT, TONE_TEXT } from "@/components/common/tones";
 import { MESSAGES } from "@/constants/messages";
 import { MESSAGE_MAX } from "@/constants/ui";
 import { getErrorMessage } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import {
   useDraft,
   useRegenerateDraft,
   useSendReply,
   useUpdateTicket,
 } from "@/features/admin-ticket/hooks/use-admin-ticket";
+import { DraftEditorSkeleton } from "@/features/admin-ticket/components/admin-ticket-skeletons";
 import { createMessageSchema } from "@/shared/schemas/ticket.schema";
 import type { AdminTicketDetailDTO, DraftDTO } from "@/shared/types/dto";
 
@@ -134,17 +136,17 @@ export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
   }
 
   return (
-    <Card size="sm" className="ring-violet-200">
+    <Card size="sm" className={AI_RING}>
       <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="size-4 text-violet-600" aria-hidden />
+          <Sparkles className={cn("size-4", TONE_TEXT.ai)} aria-hidden />
           Reply to author
         </CardTitle>
         <div className="flex flex-wrap items-center gap-1.5">
           {composer.fromDraft && draft?.status === "READY" && (
             <Badge
               variant="outline"
-              className="border-0 bg-violet-50 text-violet-700 ring-1 ring-violet-200 ring-inset"
+              className={TONE_CALLOUT.aiBadge}
               title={draft.model ? `Model: ${draft.model}` : undefined}
             >
               {draft.cached ? "AI draft · cached" : "AI draft · freshly generated"}
@@ -159,26 +161,17 @@ export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {unavailableMessage && (
-          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          <Alert className={TONE_CALLOUT.warn}>
             <AlertTriangle aria-hidden />
             <AlertTitle>AI draft unavailable</AlertTitle>
-            <AlertDescription className="text-amber-800">
+            <AlertDescription className={TONE_CALLOUT.warnBody}>
               {unavailableMessage} You can write a manual reply below.
             </AlertDescription>
           </Alert>
         )}
 
         {loadingDraft && !manual ? (
-          <div className="space-y-2" aria-busy="true">
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-              {MESSAGES.draft.loading}
-            </p>
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-11/12" />
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="h-4 w-2/3" />
-          </div>
+          <DraftEditorSkeleton message={MESSAGES.draft.loading} />
         ) : (
           <div className="space-y-1.5">
             <Label htmlFor="admin-reply" className="sr-only">
@@ -287,7 +280,7 @@ export function DraftReplyPanel({ ticket }: { ticket: AdminTicketDetailDTO }) {
         </div>
       </CardContent>
 
-      <ConfirmDialog
+      <LazyConfirmDialog
         open={confirmRegenerate}
         onOpenChange={setConfirmRegenerate}
         title="Replace your edits?"

@@ -1,11 +1,13 @@
 "use client";
 
-import { UserX } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { RotateCw, UserX } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TONE_TEXT } from "@/components/common/tones";
 import { PRIORITY_DOT_CLASSES } from "@/constants/ui";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAdminStats } from "@/features/admin-queue/hooks/use-admin-queue";
+import { QueueStatsSkeleton } from "@/features/admin-queue/components/queue-skeletons";
 import {
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
@@ -21,10 +23,21 @@ export function QueueStatsStrip({
   query: AdminQueueQuery;
   onFilter: (patch: Partial<AdminQueueQuery>) => void;
 }) {
-  const { data, isPending, isError } = useAdminStats();
+  const { data, isPending, isError, refetch, isRefetching } = useAdminStats();
 
-  if (isPending) return <Skeleton className="mb-4 h-14 w-full rounded-xl" />;
-  if (isError) return null;
+  if (isPending) return <QueueStatsSkeleton />;
+  if (isError) {
+    // Secondary widget: a compact retry instead of a full error card above the queue.
+    return (
+      <p className="mb-4 flex items-center gap-2 text-xs text-muted-foreground" role="alert">
+        Couldn&apos;t load the open-ticket counts.
+        <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isRefetching}>
+          <RotateCw className={cn(isRefetching && "animate-spin")} aria-hidden />
+          Retry
+        </Button>
+      </p>
+    );
+  }
 
   const totalOpen =
     TICKET_PRIORITIES.reduce((s, p) => s + (data.openByPriority[p] ?? 0), 0) +
@@ -77,7 +90,7 @@ export function QueueStatsStrip({
         <span
           className={cn(
             "text-lg leading-tight font-semibold tabular-nums",
-            data.unassigned > 0 && "text-orange-600",
+            data.unassigned > 0 && TONE_TEXT.attention,
           )}
         >
           {formatNumber(data.unassigned)}

@@ -178,6 +178,35 @@ describe("admin API", () => {
       expect(range.json.data.every((r: { createdAt: string }) => r.createdAt.startsWith(today))).toBe(true);
     });
 
+    it("keeps urgency order when the status filter is one-sided (index-friendly sort path)", async () => {
+      const byUrgency = (rows: { priority: string | null; createdAt: string }[]) => {
+        const rank = (p: string | null) => (p ? { CRITICAL: 3, HIGH: 2, MEDIUM: 1, LOW: 0 }[p]! : -1);
+        for (let i = 1; i < rows.length; i++) {
+          const [a, b] = [rows[i - 1], rows[i]];
+          expect(rank(a.priority)).toBeGreaterThanOrEqual(rank(b.priority));
+          if (rank(a.priority) === rank(b.priority)) {
+            expect(Date.parse(a.createdAt)).toBeLessThanOrEqual(Date.parse(b.createdAt));
+          }
+        }
+      };
+      const live = await call(queueGET as Handler, {
+        url: "/api/v1/admin/tickets?status=OPEN,IN_PROGRESS&limit=100",
+        cookie: admin,
+      });
+      expect(live.status).toBe(200);
+      expect(live.json.data.length).toBeGreaterThan(1);
+      byUrgency(live.json.data);
+
+      // Mixed filter still puts every live ticket before every done one.
+      const mixed = await call(queueGET as Handler, {
+        url: "/api/v1/admin/tickets?status=RESOLVED,OPEN&limit=100",
+        cookie: admin,
+      });
+      const statuses: string[] = mixed.json.data.map((r: { status: string }) => r.status);
+      expect(statuses.indexOf("RESOLVED")).toBeGreaterThan(statuses.lastIndexOf("OPEN"));
+      expect(mixed.json.data.some((r: { _resolved?: unknown }) => "_resolved" in r)).toBe(false);
+    });
+
     it("paginates with meta", async () => {
       const res = await call(queueGET as Handler, { url: "/api/v1/admin/tickets?limit=3&page=2", cookie: admin });
       expect(res.json.meta).toMatchObject({ page: 2, limit: 3, total: 9, totalPages: 3 });
@@ -266,6 +295,27 @@ describe("admin API", () => {
       });
       expect(res.status).toBe(200);
       expect(await TicketEvent.countDocuments({ ticketId })).toBe(before);
+    });
+
+    it("take-over records both names and the detail resolves author + assignee together", async () => {
+      const assign = (cookie: string) =>
+        call(detailPATCH as Handler, {
+          method: "PATCH",
+          url: `/api/v1/admin/tickets/${ticketId}`,
+          cookie,
+          params: params(),
+          body: { assigneeId: "me" },
+        });
+      await assign(admin);
+      const taken = await assign(ops);
+      expect(taken.status).toBe(200);
+      const d = taken.json.data;
+      expect(d.assignee.name).not.toBe("Aisha Verma");
+      expect(d.assignee.name).not.toBe("Unknown admin");
+      expect(d.author).toMatchObject({ name: expect.any(String), email: "diya.chatterjee@email.com" });
+      expect(d.authorProfile).toMatchObject({ code: "AUTH010" });
+      const last = d.events.at(-1);
+      expect(last).toMatchObject({ type: "ASSIGNED", from: "Aisha Verma", to: d.assignee.name });
     });
 
     it("reopening clears resolvedAt; assigning to a non-admin is 422; null unassigns", async () => {
@@ -444,6 +494,18 @@ describe("admin API", () => {
       expect(res.status).toBe(200);
       expect(ai.classifyTicket).toHaveBeenCalledWith(ticketId);
       expect(res.json.data.id).toBe(ticketId);
+    });
+
+    it("404s a classification retry for an unknown ticket without calling the AI", async () => {
+      const missing = "0123456789abcdef01234567";
+      const res = await call(retryPOST as Handler, {
+        method: "POST",
+        url: `/api/v1/admin/tickets/${missing}/ai/retry`,
+        cookie: admin,
+        params: { ticketId: missing },
+      });
+      expect(res.status).toBe(404);
+      expect(ai.classifyTicket).not.toHaveBeenCalled();
     });
 
     it("forbids authors from admin AI endpoints", async () => {

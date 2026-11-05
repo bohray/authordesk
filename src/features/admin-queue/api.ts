@@ -1,7 +1,11 @@
 import { apiClient } from "@/lib/api-client";
 import { API_ROUTES } from "@/constants/routes";
 import { PAGE_SIZE } from "@/constants/ui";
-import type { AdminStatsDTO, AdminTicketListItemDTO } from "@/shared/types/dto";
+import type {
+  AdminStatsDTO,
+  AdminTicketDetailDTO,
+  AdminTicketListItemDTO,
+} from "@/shared/types/dto";
 import type { AdminQueueQuery } from "@/types/queue";
 
 /** Converts UI filters to the GET /admin/tickets query string contract. */
@@ -29,4 +33,7 @@ export const adminQueueApi = {
     ),
   stats: (signal?: AbortSignal) =>
     apiClient.get<AdminStatsDTO>(API_ROUTES.admin.stats, undefined, signal),
+  /** Ticket detail, used only to prefetch on row hover (shares the detail cache key). */
+  detail: (id: string, signal?: AbortSignal) =>
+    apiClient.get<AdminTicketDetailDTO>(API_ROUTES.admin.ticket(id), undefined, signal),
 };

@@ -35,6 +35,8 @@ export const Errors = {
   validation: (details: unknown, msg = "Request validation failed") =>
     new AppError("VALIDATION_ERROR", msg, details),
   conflict: (msg: string) => new AppError("CONFLICT", msg),
+  /** Replying to a CLOSED ticket (author or admin side). */
+  ticketClosed: () => new AppError("CONFLICT", "This ticket is closed. Please open a new ticket."),
   rateLimited: (msg = "Too many requests, please try again later") =>
     new AppError("RATE_LIMITED", msg),
 };

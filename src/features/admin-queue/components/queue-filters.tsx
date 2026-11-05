@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { SelectField } from "@/components/forms/select-field";
 import { useDebounce } from "@/hooks/use-debounce";
 import { SEARCH_DEBOUNCE_MS } from "@/constants/ui";
 import { cn } from "@/lib/utils";
-import { DEFAULT_QUEUE_STATUS } from "@/features/admin-queue/hooks/use-queue-filters";
+import { DEFAULT_QUEUE_STATUS, sameSet } from "@/features/admin-queue/hooks/use-queue-filters";
 import {
   TICKET_CATEGORIES,
   TICKET_CATEGORY_LABELS,
@@ -48,9 +48,13 @@ const SORT_OPTIONS = [
 function SearchBox({ initial, onSearch }: { initial: string; onSearch: (q: string) => void }) {
   const [value, setValue] = useState(initial);
   const debounced = useDebounce(value, SEARCH_DEBOUNCE_MS);
+  // Effect event: reads the latest `initial`/`onSearch` without re-running when they change,
+  // so only a newly settled value triggers a search (no suppressed deps lint).
+  const pushSearch = useEffectEvent((q: string) => {
+    if (q.trim() !== initial.trim()) onSearch(q);
+  });
   useEffect(() => {
-    if (debounced.trim() !== initial.trim()) onSearch(debounced);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to the settled value
+    pushSearch(debounced);
   }, [debounced]);
   return (
     <div className="relative min-w-0 flex-1">
@@ -90,9 +94,7 @@ export function QueueFilters({
     onChange({ status: TICKET_STATUSES.filter((x) => next.includes(x)) });
   };
   const allSelected = query.status.length === 0;
-  const unresolvedOnly =
-    query.status.length === DEFAULT_QUEUE_STATUS.length &&
-    DEFAULT_QUEUE_STATUS.every((s) => query.status.includes(s));
+  const unresolvedOnly = sameSet(query.status, DEFAULT_QUEUE_STATUS);
 
   const chip = (active: boolean) =>
     cn(

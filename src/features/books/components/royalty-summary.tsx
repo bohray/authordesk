@@ -2,24 +2,21 @@ import type { LucideIcon } from "lucide-react";
 import { BookCopy, CalendarClock, CheckCircle2, Hourglass, IndianRupee } from "lucide-react";
 import type { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDate, formatINR, formatNumber } from "@/lib/format";
+import { TONE_TEXT } from "@/components/common/tones";
+import { formatDate, formatINR, formatNumber, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { summaryCardClass } from "@/features/books/components/layout";
 import { getPayoutSummary } from "@/features/books/utils/royalty";
 import type { MyBooksDTO } from "@/shared/types/dto";
 
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  footer,
-  className,
-}: {
+interface StatCardProps {
   label: string;
   value: ReactNode;
   icon: LucideIcon;
   footer?: ReactNode;
-  className?: string;
-}) {
+}
+
+function StatCard({ label, value, icon: Icon, footer, className }: StatCardProps & { className?: string }) {
   return (
     <Card size="sm" className={className}>
       <CardContent className="space-y-1">
@@ -35,34 +32,33 @@ function StatCard({
 }
 
 export function RoyaltySummary({ data }: { data: MyBooksDTO }) {
-  const { totals } = data;
+  const { totals, books } = data;
   const payout = getPayoutSummary(data);
-  const live = data.books.filter((b) => b.isPublished).length;
+  const live = books.filter((b) => b.isPublished).length;
+
+  const cards: StatCardProps[] = [
+    {
+      label: "Copies sold",
+      value: formatNumber(totals.copiesSold),
+      icon: BookCopy,
+      footer: `${live} of ${plural(books.length, "book")} live`,
+    },
+    { label: "Royalty earned", value: formatINR(totals.earned), icon: IndianRupee, footer: "Lifetime" },
+    { label: "Paid to you", value: formatINR(totals.paid), icon: CheckCircle2, footer: "Lifetime" },
+    { label: "Pending", value: formatINR(totals.pending), icon: Hourglass, footer: "Earned, not yet paid" },
+    {
+      label: "Next payout",
+      value: formatDate(data.nextPayoutDate),
+      icon: CalendarClock,
+      footer: <span className={cn(payout.tone === "warn" && TONE_TEXT.warn)}>{payout.text}</span>,
+    },
+  ];
+
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-      <StatCard
-        label="Copies sold"
-        value={formatNumber(totals.copiesSold)}
-        icon={BookCopy}
-        footer={`${live} of ${data.books.length} book${data.books.length === 1 ? "" : "s"} live`}
-      />
-      <StatCard label="Royalty earned" value={formatINR(totals.earned)} icon={IndianRupee} footer="Lifetime" />
-      <StatCard label="Paid to you" value={formatINR(totals.paid)} icon={CheckCircle2} footer="Lifetime" />
-      <StatCard
-        label="Pending"
-        value={formatINR(totals.pending)}
-        icon={Hourglass}
-        footer="Earned, not yet paid"
-      />
-      <StatCard
-        label="Next payout"
-        value={formatDate(data.nextPayoutDate)}
-        icon={CalendarClock}
-        className="col-span-2 lg:col-span-1"
-        footer={
-          <span className={cn(payout.tone === "warn" && "text-amber-700")}>{payout.text}</span>
-        }
-      />
+      {cards.map((card, i) => (
+        <StatCard key={card.label} {...card} className={summaryCardClass(i)} />
+      ))}
     </div>
   );
 }

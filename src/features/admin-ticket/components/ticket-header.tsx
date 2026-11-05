@@ -7,11 +7,14 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/forms/select-field";
 import { AgeBadge } from "@/components/common/age-badge";
-import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { LazyConfirmDialog } from "@/components/common/lazy-confirm-dialog";
 import { PriorityBadge } from "@/components/common/priority-badge";
 import { RelativeTime } from "@/components/common/relative-time";
 import { StatusBadge } from "@/components/common/status-badge";
+import { TONE_TEXT } from "@/components/common/tones";
 import { ROUTES } from "@/constants/routes";
+import { bookLabel } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useCurrentAdmin, useUpdateTicket } from "@/features/admin-ticket/hooks/use-admin-ticket";
 import {
   TICKET_STATUSES,
@@ -63,7 +66,7 @@ export function TicketHeader({ ticket }: { ticket: AdminTicketDetailDTO }) {
         <span aria-hidden>·</span>
         <span className="inline-flex items-center gap-1">
           <BookOpen className="size-3.5" aria-hidden />
-          {ticket.book?.title ?? "General / Account Level"}
+          {bookLabel(ticket.book)}
         </span>
         <span aria-hidden>·</span>
         <span>
@@ -96,7 +99,7 @@ export function TicketHeader({ ticket }: { ticket: AdminTicketDetailDTO }) {
                   ticket.assignee.name
                 )
               ) : (
-                <span className="font-medium text-orange-600">Unassigned</span>
+                <span className={cn("font-medium", TONE_TEXT.attention)}>Unassigned</span>
               )}
             </span>
             {assignedToMe ? (
@@ -128,7 +131,7 @@ export function TicketHeader({ ticket }: { ticket: AdminTicketDetailDTO }) {
         </div>
       </div>
 
-      <ConfirmDialog
+      <LazyConfirmDialog
         open={confirmClose}
         onOpenChange={setConfirmClose}
         title="Close this ticket?"

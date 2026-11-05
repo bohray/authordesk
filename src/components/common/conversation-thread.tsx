@@ -3,10 +3,17 @@
 import { Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RelativeTime } from "@/components/common/relative-time";
+import { TONE_TEXT } from "@/components/common/tones";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/shared/constants/roles";
 import type { TicketMessageDTO } from "@/shared/types/dto";
+
+/** Sender label by viewer → sender role. A lookup table instead of nested ternaries. */
+const SENDER_LABEL = {
+  AUTHOR: { AUTHOR: () => "You", ADMIN: (name: string) => `${name} · Support team` },
+  ADMIN: { AUTHOR: (name: string) => `${name} · Author`, ADMIN: (name: string) => `${name} · Support` },
+} satisfies Record<Role, Record<Role, (name: string) => string>>;
 
 /**
  * Chat-style thread. `viewerRole` decides which side is "mine" and how senders are labelled:
@@ -32,14 +39,7 @@ export function ConversationThread({
       {messages.map((m) => {
         const mine = m.senderRole === viewerRole;
         const isSupport = m.senderRole === "ADMIN";
-        const label =
-          viewerRole === "AUTHOR"
-            ? isSupport
-              ? `${m.senderName} · Support team`
-              : "You"
-            : isSupport
-              ? `${m.senderName} · Support`
-              : `${m.senderName} · Author`;
+        const label = SENDER_LABEL[viewerRole][m.senderRole](m.senderName);
         return (
           <li key={m.id} className={cn("flex gap-3", mine && "flex-row-reverse")}>
             <Avatar size="sm" className="mt-0.5">
@@ -59,7 +59,7 @@ export function ConversationThread({
                 <span className="font-medium text-foreground">{label}</span>
                 <RelativeTime date={m.createdAt} />
                 {showAiAssisted && m.aiAssisted && (
-                  <span className="inline-flex items-center gap-1 text-violet-700">
+                  <span className={cn("inline-flex items-center gap-1", TONE_TEXT.ai)}>
                     <Sparkles className="size-3" aria-hidden /> AI-assisted
                   </span>
                 )}

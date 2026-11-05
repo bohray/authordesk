@@ -9,5 +9,6 @@ export default async function AuthorTicketPage({
   params: Promise<{ ticketId: string }>;
 }) {
   const { ticketId } = await params;
-  return <TicketDetail ticketId={ticketId} />;
+  // Keyed so local state (e.g. a half-written reply) resets when switching tickets.
+  return <TicketDetail key={ticketId} ticketId={ticketId} />;
 }

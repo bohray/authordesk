@@ -7,9 +7,7 @@ import {
   type TicketStatus,
 } from "@/shared/constants/ticket";
 import { Ticket } from "../db/models";
-import type { TicketQueueRecord, TicketRecord } from "./types";
-
-type Id = string | Types.ObjectId;
+import type { Id, TicketQueueRecord, TicketRecord } from "./types";
 const oid = (id: Id) => (typeof id === "string" ? new Types.ObjectId(id) : id);
 
 /** Fields an author view needs. Admin-only data is excluded at the query level too. */
@@ -121,19 +119,35 @@ function buildQueueMatch(c: QueueCriteria): Record<string, unknown> {
   return match;
 }
 
+/** Urgency order within one side (live or done). _id is the tiebreaker so pages are stable. */
+const URGENCY_SORT = { priorityRank: -1, createdAt: 1, _id: 1 } as const;
+
 const SORTS: Record<QueueCriteria["sort"], Record<string, 1 | -1>> = {
   // _resolved: 0 for OPEN/IN_PROGRESS, 1 for RESOLVED/CLOSED, so live work always comes first.
-  // _id is the final tiebreaker so pagination is stable.
-  urgency: { _resolved: 1, priorityRank: -1, createdAt: 1, _id: 1 },
+  urgency: { _resolved: 1, ...URGENCY_SORT },
   newest: { createdAt: -1, _id: -1 },
   oldest: { createdAt: 1, _id: 1 },
 };
 
+/**
+ * The `_resolved` sort key is only needed when the result can mix live and done tickets.
+ * When the status filter is one-sided (e.g. the default "Open + In Progress" view) it would
+ * be constant, and skipping the computed field lets Mongo sort with the
+ * { status, priorityRank, createdAt } index instead of sorting every match in memory.
+ */
+function needsResolvedKey(statuses: TicketStatus[] | undefined): boolean {
+  if (!statuses?.length) return true;
+  const live = statuses.filter((s) => UNRESOLVED_STATUSES.includes(s)).length;
+  return live > 0 && live < statuses.length;
+}
+
 /** One aggregation returns the page and the total, already sorted by urgency rank. */
 export async function queryAdminQueue(c: QueueCriteria) {
+  const resolvedKey = c.sort === "urgency" && needsResolvedKey(c.statuses);
+  const sort = c.sort === "urgency" && !resolvedKey ? URGENCY_SORT : SORTS[c.sort];
   const pipeline: PipelineStage[] = [
     { $match: buildQueueMatch(c) },
-    ...(c.sort === "urgency"
+    ...(resolvedKey
       ? [
           {
             $addFields: {
@@ -142,7 +156,7 @@ export async function queryAdminQueue(c: QueueCriteria) {
           },
         ]
       : []),
-    { $sort: SORTS[c.sort] },
+    { $sort: sort },
     {
       $facet: {
         items: [

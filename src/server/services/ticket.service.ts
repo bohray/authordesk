@@ -23,8 +23,6 @@ import { runAfterResponse } from "./background";
  * author can only ever see or touch their own tickets.
  */
 
-const CLOSED_MESSAGE = "This ticket is closed. Please open a new ticket.";
-
 export async function listMyTickets(session: Session, page: number, limit: number) {
   const { items, total } = await listTicketsForAuthor(session.userId, (page - 1) * limit, limit);
   return { items: items.map(toAuthorTicketDTO), total };
@@ -92,7 +90,7 @@ export async function addMyMessage(
 ): Promise<AuthorTicketDTO> {
   const ticket = await findTicketForAuthor(ticketId, session.userId);
   if (!ticket) throw Errors.notFound("Ticket");
-  if (ticket.status === "CLOSED") throw Errors.conflict(CLOSED_MESSAGE);
+  if (ticket.status === "CLOSED") throw Errors.ticketClosed();
 
   // A follow-up on a resolved ticket means the issue isn't solved: reopen it.
   const reopen = ticket.status === "RESOLVED";
@@ -115,7 +113,7 @@ export async function addMyMessage(
     // Guard against an admin closing the ticket between our read and this write.
     { authorId: ticket.authorId, status: { $ne: "CLOSED" } },
   );
-  if (!updated) throw Errors.conflict(CLOSED_MESSAGE);
+  if (!updated) throw Errors.ticketClosed();
 
   if (reopen) {
     await recordEvents([

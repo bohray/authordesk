@@ -1,29 +1,33 @@
 "use client";
 
+import { useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Lightbulb, Loader2, Send } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormField, describedBy } from "@/components/forms/form-field";
 import { SelectField, type SelectOption } from "@/components/forms/select-field";
-import { FilePicker } from "@/components/forms/file-picker";
 import { ErrorState } from "@/components/common/error-state";
-import { PageHeader } from "@/components/common/page-header";
+import { TONE_TEXT } from "@/components/common/tones";
 import { ROUTES } from "@/constants/routes";
 import { MESSAGES } from "@/constants/messages";
 import { DESCRIPTION_MAX, MAX_ATTACHMENT_BYTES, SUBJECT_MAX } from "@/constants/ui";
-import { formatBookStatus } from "@/lib/format";
+import { formatBookStatus, formatBytes, GENERAL_BOOK_LABEL } from "@/lib/format";
 import { getErrorMessage, getFieldErrors } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useBookOptions, useCreateTicket } from "@/features/tickets/hooks/use-author-tickets";
+import { NewTicketPageHeader } from "@/features/tickets/components/tickets-page-header";
+import { TicketFormSkeleton } from "@/features/tickets/components/ticket-skeletons";
+import { TicketTips } from "@/features/tickets/components/ticket-tips";
 import { GENERAL_BOOK_OPTION } from "@/shared/constants/ticket";
 import { createTicketSchema } from "@/shared/schemas/ticket.schema";
 import type { BookDTO } from "@/shared/types/dto";
@@ -38,6 +42,24 @@ const formSchema = createTicketSchema.extend({
 type FormValues = z.input<typeof formSchema>;
 type FormOutput = z.output<typeof formSchema>;
 const FIELDS = ["bookId", "subject", "description", "attachment"] as const;
+/** Read from the shared schema so the live counter can't drift from server validation. */
+const DESCRIPTION_MIN = createTicketSchema.shape.description.minLength ?? 0;
+
+/**
+ * The attachment picker is optional and below the fold, so it is split out of the initial
+ * bundle. The placeholder matches its button + hint so nothing shifts when it loads.
+ */
+const FilePicker = dynamic(
+  () => import("@/components/forms/file-picker").then((m) => m.FilePicker),
+  {
+    loading: () => (
+      <div className="space-y-1.5" aria-hidden>
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-3 w-56" />
+      </div>
+    ),
+  },
+);
 
 function bookOptions(books: BookDTO[]): SelectOption[] {
   return [
@@ -45,34 +67,14 @@ function bookOptions(books: BookDTO[]): SelectOption[] {
       value: b.id,
       label: b.isPublished ? b.title : `${b.title} (${formatBookStatus(b.status)})`,
     })),
-    { value: GENERAL_BOOK_OPTION, label: "General / Account Level" },
+    { value: GENERAL_BOOK_OPTION, label: GENERAL_BOOK_LABEL },
   ];
-}
-
-function Tips() {
-  return (
-    <Card size="sm" className="bg-muted/40">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Lightbulb className="size-4 text-amber-600" aria-hidden />
-          Tips for a faster answer
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ul className="list-disc space-y-1.5 pl-4 text-sm text-muted-foreground">
-          <li>Pick the book your question is about so we can see its sales and royalty data.</li>
-          <li>Include relevant dates, e.g. when you expected a payout or placed an order.</li>
-          <li>Add order numbers, platform names (Amazon, Flipkart) or links where it applies.</li>
-          <li>For printing issues, describe the defect and how many copies are affected.</li>
-        </ul>
-      </CardContent>
-    </Card>
-  );
 }
 
 function TicketForm({ books, initialBookId }: { books: BookDTO[]; initialBookId: string }) {
   const router = useRouter();
   const createTicket = useCreateTicket();
+  const options = useMemo(() => bookOptions(books), [books]);
   const {
     register,
     control,
@@ -127,7 +129,7 @@ function TicketForm({ books, initialBookId }: { books: BookDTO[]; initialBookId:
               id="bookId"
               value={field.value || null}
               onValueChange={field.onChange}
-              options={bookOptions(books)}
+              options={options}
               placeholder="Select a book"
               invalid={!!errors.bookId}
               ariaDescribedBy={describedBy("bookId", { error: errors.bookId?.message, hint: true })}
@@ -154,18 +156,18 @@ function TicketForm({ books, initialBookId }: { books: BookDTO[]; initialBookId:
         label="Describe the issue"
         required
         error={errors.description?.message}
-        hint="Include the book title, dates and any order numbers. Minimum 20 characters."
+        hint={`Include the book title, dates and any order numbers. Minimum ${DESCRIPTION_MIN} characters.`}
         aside={
           <span
             className={cn(
               "text-xs tabular-nums",
-              descLen > 0 && descLen < 20 ? "text-amber-700" : "text-muted-foreground",
+              descLen > 0 && descLen < DESCRIPTION_MIN ? TONE_TEXT.warn : "text-muted-foreground",
               descLen > DESCRIPTION_MAX && "text-destructive",
             )}
             aria-live="polite"
           >
-            {descLen < 20 && descLen > 0
-              ? `${20 - descLen} more characters needed`
+            {descLen < DESCRIPTION_MIN && descLen > 0
+              ? `${DESCRIPTION_MIN - descLen} more characters needed`
               : `${descLen.toLocaleString("en-IN")} / ${DESCRIPTION_MAX.toLocaleString("en-IN")}`}
           </span>
         }
@@ -196,7 +198,7 @@ function TicketForm({ books, initialBookId }: { books: BookDTO[]; initialBookId:
               onChange={(f) => field.onChange(f ?? undefined)}
               maxBytes={MAX_ATTACHMENT_BYTES}
               disabled={pending}
-              hint={`Max 10 MB. ${MESSAGES.tickets.attachmentNote}`}
+              hint={`Max ${formatBytes(MAX_ATTACHMENT_BYTES)}. ${MESSAGES.tickets.attachmentNote}`}
             />
           )}
         />
@@ -220,7 +222,7 @@ export function NewTicketForm() {
   const { data, isPending, isError, error, refetch, isRefetching } = useBookOptions();
 
   const requested = searchParams.get("bookId");
-  const books = data?.books ?? [];
+  const books = useMemo(() => data?.books ?? [], [data]);
   const initialBookId =
     requested && (requested === GENERAL_BOOK_OPTION || books.some((b) => b.id === requested))
       ? requested
@@ -228,19 +230,14 @@ export function NewTicketForm() {
 
   return (
     <>
-      <PageHeader
-        title="New Ticket"
-        description="Tell us what you need help with. Our support team replies right here."
-      />
+      <NewTicketPageHeader />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
           <CardContent>
             {isPending ? (
-              <div className="space-y-4" aria-busy="true">
-                <Skeleton className="h-9 w-full" />
-                <Skeleton className="h-9 w-full" />
-                <Skeleton className="h-36 w-full" />
-                <Skeleton className="h-8 w-32" />
+              <div aria-busy="true">
+                <span className="sr-only">Loading your books…</span>
+                <TicketFormSkeleton />
               </div>
             ) : isError ? (
               <ErrorState
@@ -255,7 +252,7 @@ export function NewTicketForm() {
           </CardContent>
         </Card>
         <aside className="space-y-4">
-          <Tips />
+          <TicketTips />
         </aside>
       </div>
     </>

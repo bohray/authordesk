@@ -1,9 +1,6 @@
 import "server-only";
-import type { Types } from "mongoose";
 import { TicketNote } from "../db/models";
-import type { TicketNoteRecord } from "./types";
-
-type Id = string | Types.ObjectId;
+import type { Id, TicketNoteRecord } from "./types";
 
 export async function createNote(input: {
   ticketId: Id;

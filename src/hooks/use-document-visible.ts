@@ -2,13 +2,10 @@
 
 import { useSyncExternalStore } from "react";
 
+// Only `visibilitychange` can change the snapshot; a `focus` listener just caused no-op checks.
 function subscribe(callback: () => void) {
   document.addEventListener("visibilitychange", callback);
-  window.addEventListener("focus", callback);
-  return () => {
-    document.removeEventListener("visibilitychange", callback);
-    window.removeEventListener("focus", callback);
-  };
+  return () => document.removeEventListener("visibilitychange", callback);
 }
 
 const getSnapshot = () => document.visibilityState === "visible";

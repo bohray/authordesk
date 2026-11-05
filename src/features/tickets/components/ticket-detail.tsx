@@ -7,15 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConversationThread } from "@/components/common/conversation-thread";
 import { EmptyState } from "@/components/common/empty-state";
 import { ErrorState } from "@/components/common/error-state";
-import { DetailSkeleton } from "@/components/common/loading-state";
 import { RelativeTime } from "@/components/common/relative-time";
 import { StatusBadge } from "@/components/common/status-badge";
 import { ROUTES } from "@/constants/routes";
 import { MESSAGES } from "@/constants/messages";
-import { formatBytes, formatDateTime } from "@/lib/format";
-import { isApiError } from "@/lib/api-client";
+import { bookLabel, formatBytes, formatDateTime } from "@/lib/format";
+import { isNotFoundError } from "@/lib/api-client";
 import { useMyTicket } from "@/features/tickets/hooks/use-author-tickets";
 import { ReplyForm } from "@/features/tickets/components/reply-form";
+import { TicketDetailSkeleton } from "@/features/tickets/components/ticket-skeletons";
 import type { TicketStatus } from "@/shared/constants/ticket";
 
 const STATUS_HINT: Record<TicketStatus, { icon: typeof Clock; text: string }> = {
@@ -40,9 +40,9 @@ function BackLink() {
 export function TicketDetail({ ticketId }: { ticketId: string }) {
   const { data: ticket, isPending, isError, error, refetch, isRefetching } = useMyTicket(ticketId);
 
-  if (isPending) return <DetailSkeleton />;
+  if (isPending) return <TicketDetailSkeleton />;
   if (isError) {
-    const notFound = isApiError(error) && (error.status === 404 || error.status === 400 || error.status === 422);
+    const notFound = isNotFoundError(error);
     return (
       <>
         <BackLink />
@@ -79,7 +79,7 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <BookOpen className="size-3.5" aria-hidden />
-            {ticket.book ? ticket.book.title : "General / Account Level"}
+            {bookLabel(ticket.book)}
           </span>
           <span aria-hidden>·</span>
           <span title={formatDateTime(ticket.createdAt)}>

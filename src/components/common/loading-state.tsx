@@ -1,6 +1,10 @@
 import { Loader2 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+/**
+ * Inline progress indicators. Layout-matching skeletons for first loads live in
+ * `skeletons.tsx`; these are for work happening on screen that is already rendered.
+ */
 
 /** Inline spinner with label. */
 export function Spinner({ label, className }: { label?: string; className?: string }) {
@@ -12,49 +16,23 @@ export function Spinner({ label, className }: { label?: string; className?: stri
   );
 }
 
-/** Generic skeleton list (rows). */
-export function ListSkeleton({ rows = 5, className }: { rows?: number; className?: string }) {
+/**
+ * Subtle "refreshing" hint shown while previous data stays on screen (filter / page change),
+ * instead of blanking the list. Reserves its space so toggling it never shifts layout.
+ */
+export function UpdatingIndicator({ active, className }: { active: boolean; className?: string }) {
   return (
-    <div className={cn("space-y-2", className)} aria-busy="true" aria-label="Loading">
-      {Array.from({ length: rows }, (_, i) => (
-        <Skeleton key={i} className="h-14 w-full" />
-      ))}
-    </div>
-  );
-}
-
-/** Row of stat card skeletons. */
-export function CardsSkeleton({ count = 4, className }: { count?: number; className?: string }) {
-  return (
-    <div
-      className={cn("grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5", className)}
-      aria-busy="true"
-      aria-label="Loading"
-    >
-      {Array.from({ length: count }, (_, i) => (
-        <Skeleton key={i} className="h-24 w-full rounded-xl" />
-      ))}
-    </div>
-  );
-}
-
-/** Full section loader for detail pages. */
-export function DetailSkeleton() {
-  return (
-    <div className="space-y-4" aria-busy="true" aria-label="Loading">
-      <Skeleton className="h-8 w-2/3" />
-      <Skeleton className="h-4 w-1/3" />
-      <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-3">
-          <Skeleton className="h-32 w-full rounded-xl" />
-          <Skeleton className="h-24 w-full rounded-xl" />
-          <Skeleton className="h-48 w-full rounded-xl" />
-        </div>
-        <div className="space-y-3">
-          <Skeleton className="h-40 w-full rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-xl" />
-        </div>
-      </div>
-    </div>
+    <span role="status" aria-live="polite" className={cn("inline-flex", className)}>
+      <span
+        aria-hidden={!active}
+        className={cn(
+          "inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-opacity",
+          active ? "opacity-100" : "opacity-0",
+        )}
+      >
+        <Loader2 className={cn("size-3.5", active && "animate-spin")} aria-hidden />
+        {active ? "Updating…" : <span className="invisible">Updating…</span>}
+      </span>
+    </span>
   );
 }

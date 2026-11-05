@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
@@ -14,9 +15,16 @@ import { BookStatusBadge } from "@/components/common/book-status-badge";
 import { Currency } from "@/components/common/currency";
 import { ROUTES } from "@/constants/routes";
 import { formatDate, formatNumber } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { BOOK_TABLE_COLUMNS } from "@/features/books/components/layout";
 import { RoyaltyNotes } from "@/features/books/components/royalty-notes";
-import { getRoyaltyNotes } from "@/features/books/utils/royalty";
+import type { RoyaltyNote } from "@/features/books/utils/royalty";
 import type { BookDTO } from "@/shared/types/dto";
+
+/** Notes per book id, computed once by the parent and shared by the table and the cards. */
+export type NotesByBook = ReadonlyMap<string, RoyaltyNote[]>;
+
+const NUMERIC_COLUMNS: ReadonlySet<string> = new Set(["MRP", "Copies sold", "Earned", "Paid", "Pending"]);
 
 function HelpLink({ bookId }: { bookId: string }) {
   return (
@@ -31,24 +39,24 @@ function HelpLink({ bookId }: { bookId: string }) {
 }
 
 /** Desktop: a full table (scrolls inside its container on narrower screens). */
-export function BooksTable({ books, threshold }: { books: BookDTO[]; threshold: number }) {
+export function BooksTable({ books, notes }: { books: BookDTO[]; notes: NotesByBook }) {
   return (
     <Card className="hidden py-0 lg:flex">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
-            <TableHead className="pl-4">Book</TableHead>
-            <TableHead>Genre</TableHead>
-            <TableHead>Published</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">MRP</TableHead>
-            <TableHead className="text-right">Copies sold</TableHead>
-            <TableHead className="text-right">Earned</TableHead>
-            <TableHead className="text-right">Paid</TableHead>
-            <TableHead className="text-right">Pending</TableHead>
-            <TableHead className="pr-4">
-              <span className="sr-only">Actions</span>
-            </TableHead>
+            {BOOK_TABLE_COLUMNS.map((label, i) => (
+              <TableHead
+                key={label || "actions"}
+                className={cn(
+                  i === 0 && "pl-4",
+                  i === BOOK_TABLE_COLUMNS.length - 1 && "pr-4",
+                  NUMERIC_COLUMNS.has(label) && "text-right",
+                )}
+              >
+                {label || <span className="sr-only">Actions</span>}
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -57,7 +65,7 @@ export function BooksTable({ books, threshold }: { books: BookDTO[]; threshold: 
               <TableCell className="max-w-72 pl-4 whitespace-normal">
                 <div className="font-medium">{b.title}</div>
                 <div className="font-mono text-xs text-muted-foreground">ISBN {b.isbn}</div>
-                <RoyaltyNotes notes={getRoyaltyNotes(b, threshold)} className="mt-1" />
+                <RoyaltyNotes notes={notes.get(b.id) ?? []} className="mt-1" />
               </TableCell>
               <TableCell>{b.genre}</TableCell>
               <TableCell>{formatDate(b.publicationDate)}</TableCell>
@@ -88,7 +96,7 @@ export function BooksTable({ books, threshold }: { books: BookDTO[]; threshold: 
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -97,8 +105,20 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** Fields shown on each mobile card, in display order. */
+const CARD_FIELDS: { label: string; render: (b: BookDTO) => ReactNode }[] = [
+  { label: "Genre", render: (b) => b.genre },
+  { label: "Published", render: (b) => formatDate(b.publicationDate) },
+  { label: "MRP", render: (b) => <Currency amount={b.mrp} /> },
+  { label: "Copies sold", render: (b) => formatNumber(b.copiesSold) },
+  { label: "Earned", render: (b) => <Currency amount={b.royalty.earned} /> },
+  { label: "Paid", render: (b) => <Currency amount={b.royalty.paid} /> },
+  { label: "Pending", render: (b) => <Currency amount={b.royalty.pending} className="font-medium" /> },
+  { label: "Last payout", render: (b) => formatDate(b.royalty.lastPayoutDate) },
+];
+
 /** Mobile / tablet: one card per book. */
-export function BookCards({ books, threshold }: { books: BookDTO[]; threshold: number }) {
+export function BookCards({ books, notes }: { books: BookDTO[]; notes: NotesByBook }) {
   return (
     <ul className="grid gap-3 sm:grid-cols-2 lg:hidden">
       {books.map((b) => (
@@ -111,24 +131,13 @@ export function BookCards({ books, threshold }: { books: BookDTO[]; threshold: n
                 <p className="font-mono text-xs text-muted-foreground">ISBN {b.isbn}</p>
               </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-                <Field label="Genre">{b.genre}</Field>
-                <Field label="Published">{formatDate(b.publicationDate)}</Field>
-                <Field label="MRP">
-                  <Currency amount={b.mrp} />
-                </Field>
-                <Field label="Copies sold">{formatNumber(b.copiesSold)}</Field>
-                <Field label="Earned">
-                  <Currency amount={b.royalty.earned} />
-                </Field>
-                <Field label="Paid">
-                  <Currency amount={b.royalty.paid} />
-                </Field>
-                <Field label="Pending">
-                  <Currency amount={b.royalty.pending} className="font-medium" />
-                </Field>
-                <Field label="Last payout">{formatDate(b.royalty.lastPayoutDate)}</Field>
+                {CARD_FIELDS.map((f) => (
+                  <Field key={f.label} label={f.label}>
+                    {f.render(b)}
+                  </Field>
+                ))}
               </dl>
-              <RoyaltyNotes notes={getRoyaltyNotes(b, threshold)} />
+              <RoyaltyNotes notes={notes.get(b.id) ?? []} />
               <HelpLink bookId={b.id} />
             </CardContent>
           </Card>

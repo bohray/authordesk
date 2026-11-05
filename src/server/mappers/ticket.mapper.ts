@@ -124,7 +124,7 @@ export function toEventDTO(e: TicketEventRecord): TicketEventDTO {
 }
 
 export interface AdminDetailContext {
-  author: UserRecord | null;
+  author: Pick<UserRecord, "_id" | "name" | "email" | "authorProfile"> | null;
   assignee: UserLite | null;
   book: BookDTO | null;
   notes: TicketNoteRecord[];

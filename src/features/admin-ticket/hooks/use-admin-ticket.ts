@@ -5,8 +5,15 @@ import { toast } from "sonner";
 import { queryKeys } from "@/constants/query-keys";
 import { AI_PENDING_REFETCH_MS } from "@/constants/ui";
 import { getErrorMessage } from "@/lib/api-client";
+import { QUERY_GC_MS, QUERY_STALE_MS } from "@/lib/query-client";
 import { adminTicketApi, type AdminTicketPatch } from "@/features/admin-ticket/api";
-import type { AdminTicketDetailDTO, DraftDTO } from "@/shared/types/dto";
+import type {
+  AdminTicketDetailDTO,
+  AdminTicketListItemDTO,
+  DraftDTO,
+  Paginated,
+  SessionUserDTO,
+} from "@/shared/types/dto";
 
 export function useAdminTicket(ticketId: string) {
   return useQuery({
@@ -20,8 +27,26 @@ export function useCurrentAdmin() {
   return useQuery({
     queryKey: queryKeys.session,
     queryFn: ({ signal }) => adminTicketApi.me(signal),
-    staleTime: 5 * 60_000,
+    staleTime: QUERY_STALE_MS.long,
   });
+}
+
+/**
+ * Applies a PATCH locally, mirroring the server rules: overrides mark the source as ADMIN,
+ * "me" assigns the current admin. Works for both the detail and a queue row.
+ */
+function applyPatch<T extends AdminTicketListItemDTO>(
+  ticket: T,
+  patch: AdminTicketPatch,
+  me: SessionUserDTO | undefined,
+): T {
+  const next = { ...ticket };
+  if (patch.status) next.status = patch.status;
+  if (patch.category) Object.assign(next, { category: patch.category, categorySource: "ADMIN" });
+  if (patch.priority) Object.assign(next, { priority: patch.priority, prioritySource: "ADMIN" });
+  if (patch.assigneeId === null) next.assignee = null;
+  else if (patch.assigneeId === "me" && me) next.assignee = { id: me.id, name: me.name };
+  return next;
 }
 
 /** Writes the fresh detail into the cache and refreshes queue + stats. */
@@ -35,18 +60,52 @@ function useSyncTicket(ticketId: string) {
   };
 }
 
+/**
+ * Status / assignee / category / priority changes are optimistic: the detail and any cached
+ * queue rows update instantly, roll back on error, and are reconciled with the server
+ * response (detail) plus a targeted refetch of lists and stats.
+ */
 export function useUpdateTicket(ticketId: string) {
-  const sync = useSyncTicket(ticketId);
+  const queryClient = useQueryClient();
+  const detailKey = queryKeys.adminTickets.detail(ticketId);
+  const listsKey = queryKeys.adminTickets.lists();
+
   return useMutation({
     mutationFn: ({ patch }: { patch: AdminTicketPatch; successMessage?: string }) =>
       adminTicketApi.update(ticketId, patch),
+    onMutate: async ({ patch }) => {
+      // Stop in-flight refetches from overwriting the optimistic value.
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: detailKey }),
+        queryClient.cancelQueries({ queryKey: listsKey }),
+      ]);
+      const me = queryClient.getQueryData<SessionUserDTO>(queryKeys.session);
+      const previousDetail = queryClient.getQueryData<AdminTicketDetailDTO>(detailKey);
+      const previousLists = queryClient.getQueriesData<Paginated<AdminTicketListItemDTO>>({
+        queryKey: listsKey,
+      });
+
+      if (previousDetail) queryClient.setQueryData(detailKey, applyPatch(previousDetail, patch, me));
+      queryClient.setQueriesData<Paginated<AdminTicketListItemDTO>>({ queryKey: listsKey }, (old) =>
+        old
+          ? { ...old, data: old.data.map((t) => (t.id === ticketId ? applyPatch(t, patch, me) : t)) }
+          : old,
+      );
+      return { previousDetail, previousLists };
+    },
     onSuccess: (ticket, vars) => {
-      sync(ticket);
+      queryClient.setQueryData(detailKey, ticket);
       toast.success(vars.successMessage ?? "Ticket updated");
     },
-    onError: (err) => {
-      sync();
+    onError: (err, _vars, snapshot) => {
+      if (snapshot?.previousDetail) queryClient.setQueryData(detailKey, snapshot.previousDetail);
+      for (const [key, data] of snapshot?.previousLists ?? []) queryClient.setQueryData(key, data);
+      void queryClient.invalidateQueries({ queryKey: detailKey });
       toast.error(getErrorMessage(err, "Couldn't update the ticket"));
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: listsKey });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.adminStats });
     },
   });
 }
@@ -95,8 +154,9 @@ export function useDraft(ticketId: string, enabled: boolean) {
     queryKey: queryKeys.adminTickets.draft(ticketId),
     queryFn: ({ signal }) => adminTicketApi.draft(ticketId, signal),
     enabled,
+    // Drafts are cached server-side and only change on regenerate (handled via setQueryData).
     staleTime: Infinity,
-    gcTime: 10 * 60_000,
+    gcTime: QUERY_GC_MS,
     retry: false,
   });
 }

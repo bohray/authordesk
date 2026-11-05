@@ -83,11 +83,28 @@ export function timeAgo(value: string | Date | null | undefined, now = Date.now(
   return formatDate(d);
 }
 
+const KB = 1024;
+const MB = KB * 1024;
+
+/** "512 B", "1.5 KB", "10 MB" (a trailing ".0" is dropped). */
 export function formatBytes(bytes: number | null | undefined): string {
   const b = bytes ?? 0;
-  if (b < 1024) return `${b} B`;
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  if (b < KB) return `${b} B`;
+  const [value, unit] = b < MB ? [b / KB, "KB"] : [b / MB, "MB"];
+  return `${value.toFixed(1).replace(/\.0$/, "")} ${unit}`;
+}
+
+/** "1 book", "3 books". Pass `pluralWord` for irregular plurals. */
+export function plural(count: number, word: string, pluralWord = `${word}s`): string {
+  return `${formatNumber(count)} ${count === 1 ? word : pluralWord}`;
+}
+
+/** Label for tickets that aren't about a specific book. */
+export const GENERAL_BOOK_LABEL = "General / Account Level";
+
+/** Book title for a ticket, or the account-level label when no book is attached. */
+export function bookLabel(book: { title: string } | null | undefined): string {
+  return book?.title || GENERAL_BOOK_LABEL;
 }
 
 /** "In Production - Cover Design" → "In Production · Cover Design" */

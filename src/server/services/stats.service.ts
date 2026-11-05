@@ -5,7 +5,9 @@ import { iso } from "../mappers/common";
 import { getAiUsageTotals } from "../repositories/ai-usage.repository";
 import { getTicketStats } from "../repositories/ticket.repository";
 
-const ratio = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 10_000) / 10_000 : 0);
+/** Ratios are rounded to 4 decimal places (0.1234 → 12.34%), enough for a percentage display. */
+const RATIO_SCALE = 10_000;
+const ratio = (num: number, den: number) => (den > 0 ? Math.round((num / den) * RATIO_SCALE) / RATIO_SCALE : 0);
 
 export async function getAdminStats(): Promise<AdminStatsDTO> {
   const [t, usage] = await Promise.all([getTicketStats(), getAiUsageTotals()]);

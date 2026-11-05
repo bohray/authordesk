@@ -17,9 +17,12 @@ import { CategoryBadge } from "@/components/common/category-badge";
 import { PriorityBadge } from "@/components/common/priority-badge";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Spinner } from "@/components/common/loading-state";
+import { TONE_TEXT } from "@/components/common/tones";
 import { ROUTES } from "@/constants/routes";
 import { PRIORITY_ROW_CLASSES } from "@/constants/ui";
+import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { QUEUE_COLUMNS } from "@/features/admin-queue/components/queue-layout";
 import { UNRESOLVED_STATUSES } from "@/shared/constants/ticket";
 import type { AdminTicketListItemDTO } from "@/shared/types/dto";
 
@@ -30,7 +33,7 @@ function AiCell({ t }: { t: AdminTicketListItemDTO }) {
       <AiSourceBadge source={t.categorySource} />
       {t.aiStatus === "FAILED" && (
         <span title="AI classification failed, rule-based fallback used">
-          <AlertTriangle className="size-3.5 text-amber-600" aria-label="AI failed" />
+          <AlertTriangle className={cn("size-3.5", TONE_TEXT.warn)} aria-label="AI failed" />
         </span>
       )}
     </span>
@@ -40,9 +43,13 @@ function AiCell({ t }: { t: AdminTicketListItemDTO }) {
 export function QueueTable({
   tickets,
   isFetching,
+  onPrefetch,
 }: {
   tickets: AdminTicketListItemDTO[];
+  /** True while previous rows are shown and the next page/filter is loading. */
   isFetching?: boolean;
+  /** Called on row hover/focus to warm the detail query. */
+  onPrefetch?: (ticketId: string) => void;
 }) {
   const router = useRouter();
   return (
@@ -51,19 +58,19 @@ export function QueueTable({
         "overflow-hidden rounded-xl border bg-background transition-opacity",
         isFetching && "opacity-70",
       )}
+      aria-busy={isFetching || undefined}
     >
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
-            <TableHead className="pl-4">Priority</TableHead>
-            <TableHead>Ticket</TableHead>
-            <TableHead>Author</TableHead>
-            <TableHead>Book</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Assignee</TableHead>
-            <TableHead>Age</TableHead>
-            <TableHead className="pr-4">AI</TableHead>
+            {QUEUE_COLUMNS.map((label, i) => (
+              <TableHead
+                key={label}
+                className={cn(i === 0 && "pl-4", i === QUEUE_COLUMNS.length - 1 && "pr-4")}
+              >
+                {label}
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -79,6 +86,8 @@ export function QueueTable({
                   if ((e.target as HTMLElement).closest("a,button")) return;
                   router.push(href);
                 }}
+                onMouseEnter={onPrefetch && (() => onPrefetch(t.id))}
+                onFocus={onPrefetch && (() => onPrefetch(t.id))}
               >
                 <TableCell className="pl-4">
                   <span className="inline-flex items-center gap-1">
@@ -99,7 +108,7 @@ export function QueueTable({
                   {t.messageCount > 0 && (
                     <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
                       <MessageSquare className="size-3" aria-hidden />
-                      {t.messageCount} message{t.messageCount === 1 ? "" : "s"}
+                      {plural(t.messageCount, "message")}
                     </span>
                   )}
                 </TableCell>
@@ -122,7 +131,7 @@ export function QueueTable({
                   {t.assignee ? (
                     <span className="text-sm text-foreground">{t.assignee.name}</span>
                   ) : (
-                    <span className="text-xs font-medium text-orange-600">Unassigned</span>
+                    <span className={cn("text-xs font-medium", TONE_TEXT.attention)}>Unassigned</span>
                   )}
                 </TableCell>
                 <TableCell>

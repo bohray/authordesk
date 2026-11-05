@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/forms/select-field";
 import { AiSourceBadge } from "@/components/common/ai-source-badge";
 import { Spinner } from "@/components/common/loading-state";
+import { CONFIDENCE_BAR, TONE_CALLOUT, TONE_TEXT } from "@/components/common/tones";
 import { formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRetryAi, useUpdateTicket } from "@/features/admin-ticket/hooks/use-admin-ticket";
@@ -24,6 +25,15 @@ import type { AdminTicketDetailDTO } from "@/shared/types/dto";
 const CATEGORY_OPTIONS = TICKET_CATEGORIES.map((c) => ({ value: c, label: TICKET_CATEGORY_LABELS[c] }));
 const PRIORITY_OPTIONS = TICKET_PRIORITIES.map((p) => ({ value: p, label: TICKET_PRIORITY_LABELS[p] }));
 
+/** Confidence bands for the bar colour (0..1). */
+const CONFIDENCE_HIGH = 0.75;
+const CONFIDENCE_MEDIUM = 0.5;
+
+function confidenceBand(c: number): keyof typeof CONFIDENCE_BAR {
+  if (c >= CONFIDENCE_HIGH) return "high";
+  return c >= CONFIDENCE_MEDIUM ? "medium" : "low";
+}
+
 export function ClassificationCard({ ticket }: { ticket: AdminTicketDetailDTO }) {
   const update = useUpdateTicket(ticket.id);
   const retry = useRetryAi(ticket.id);
@@ -38,7 +48,7 @@ export function ClassificationCard({ ticket }: { ticket: AdminTicketDetailDTO })
     <Card size="sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="size-4 text-violet-600" aria-hidden />
+          <Sparkles className={cn("size-4", TONE_TEXT.ai)} aria-hidden />
           Classification
         </CardTitle>
       </CardHeader>
@@ -101,10 +111,10 @@ export function ClassificationCard({ ticket }: { ticket: AdminTicketDetailDTO })
         )}
 
         {failed && (
-          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          <Alert className={TONE_CALLOUT.warn}>
             <AlertTriangle aria-hidden />
             <AlertTitle>AI unavailable, rule-based fallback used</AlertTitle>
-            <AlertDescription className="text-amber-800">
+            <AlertDescription className={TONE_CALLOUT.warnBody}>
               {ai.error && <p className="text-xs">{ai.error}</p>}
               <Button
                 variant="outline"
@@ -121,7 +131,7 @@ export function ClassificationCard({ ticket }: { ticket: AdminTicketDetailDTO })
         )}
 
         {ticket.aiStatus === "DONE" && (confidence !== null || ai.reasoning) && (
-          <div className="space-y-2 rounded-lg bg-violet-50/60 px-3 py-2.5 text-sm">
+          <div className={cn("space-y-2 rounded-lg px-3 py-2.5 text-sm", TONE_CALLOUT.ai)}>
             {confidence !== null && (
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
@@ -129,7 +139,7 @@ export function ClassificationCard({ ticket }: { ticket: AdminTicketDetailDTO })
                   <span className="font-medium tabular-nums">{formatPercent(confidence)}</span>
                 </div>
                 <div
-                  className="h-1.5 overflow-hidden rounded-full bg-violet-100"
+                  className={cn("h-1.5 overflow-hidden rounded-full", TONE_CALLOUT.aiTrack)}
                   role="meter"
                   aria-label="AI confidence"
                   aria-valuemin={0}
@@ -137,10 +147,7 @@ export function ClassificationCard({ ticket }: { ticket: AdminTicketDetailDTO })
                   aria-valuenow={Math.round(confidence * 100)}
                 >
                   <div
-                    className={cn(
-                      "h-full rounded-full",
-                      confidence >= 0.75 ? "bg-violet-600" : confidence >= 0.5 ? "bg-amber-500" : "bg-red-500",
-                    )}
+                    className={cn("h-full rounded-full", CONFIDENCE_BAR[confidenceBand(confidence)])}
                     style={{ width: `${Math.min(100, Math.max(0, confidence * 100))}%` }}
                   />
                 </div>

@@ -22,7 +22,7 @@ import {
 } from "@/shared/constants/ticket";
 import type { TicketEventDTO } from "@/shared/types/dto";
 
-const ICONS: Record<TicketEventType, LucideIcon> = {
+const ICONS = {
   CREATED: CirclePlus,
   STATUS_CHANGED: ArrowRightLeft,
   CATEGORY_CHANGED: Tag,
@@ -31,7 +31,7 @@ const ICONS: Record<TicketEventType, LucideIcon> = {
   AI_CLASSIFIED: Sparkles,
   REPLIED: MessageSquare,
   NOTE_ADDED: StickyNote,
-};
+} satisfies Record<TicketEventType, LucideIcon>;
 
 const LABELS: Record<string, string> = {
   ...TICKET_STATUS_LABELS,
@@ -48,30 +48,31 @@ function label(value: string | null): string {
     .join(" · ");
 }
 
+/** "from X " when a previous value exists, so changes read "changed status from Open to Resolved". */
+const fromPart = (e: TicketEventDTO) => (e.from ? `from ${label(e.from)} ` : "");
+
+/** One sentence per event type. Exhaustive, so a new event type is a compile error here. */
+const DESCRIBE = {
+  CREATED: (e) => `${e.actorName} opened the ticket`,
+  STATUS_CHANGED: (e) => `${e.actorName} changed status ${fromPart(e)}to ${label(e.to)}`,
+  CATEGORY_CHANGED: (e) => `${e.actorName} changed category ${fromPart(e)}to ${label(e.to)}`,
+  PRIORITY_CHANGED: (e) => `${e.actorName} changed priority ${fromPart(e)}to ${label(e.to)}`,
+  ASSIGNED: (e) =>
+    e.to ? `${e.actorName} assigned the ticket to ${e.to}` : `${e.actorName} unassigned the ticket`,
+  AI_CLASSIFIED: (e) =>
+    e.to ? `${e.actorName} classified it as ${label(e.to)}` : `${e.actorName} ran classification`,
+  REPLIED: (e) => `${e.actorName} replied`,
+  NOTE_ADDED: (e) => `${e.actorName} added an internal note`,
+} satisfies Record<TicketEventType, (e: TicketEventDTO) => string>;
+
 function describe(e: TicketEventDTO): string {
-  switch (e.type) {
-    case "CREATED":
-      return `${e.actorName} opened the ticket`;
-    case "STATUS_CHANGED":
-      return `${e.actorName} changed status ${e.from ? `from ${label(e.from)} ` : ""}to ${label(e.to)}`;
-    case "CATEGORY_CHANGED":
-      return `${e.actorName} changed category ${e.from ? `from ${label(e.from)} ` : ""}to ${label(e.to)}`;
-    case "PRIORITY_CHANGED":
-      return `${e.actorName} changed priority ${e.from ? `from ${label(e.from)} ` : ""}to ${label(e.to)}`;
-    case "ASSIGNED":
-      return e.to ? `${e.actorName} assigned the ticket to ${e.to}` : `${e.actorName} unassigned the ticket`;
-    case "AI_CLASSIFIED":
-      return e.to ? `${e.actorName} classified it as ${label(e.to)}` : `${e.actorName} ran classification`;
-    case "REPLIED":
-      return `${e.actorName} replied`;
-    case "NOTE_ADDED":
-      return `${e.actorName} added an internal note`;
-    default:
-      return `${e.actorName}: ${String(e.type).toLowerCase().replace(/_/g, " ")}`;
-  }
+  // Fallback guards against an event type newer than this client bundle.
+  const fn: ((e: TicketEventDTO) => string) | undefined = DESCRIBE[e.type];
+  return fn ? fn(e) : `${e.actorName}: ${String(e.type).toLowerCase().replace(/_/g, " ")}`;
 }
 
 export function ActivityTimeline({ events }: { events: TicketEventDTO[] }) {
+  // Newest first. Sorting a copy keeps the cached query data untouched.
   const sorted = [...events].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return (
     <Card size="sm">
@@ -87,7 +88,7 @@ export function ActivityTimeline({ events }: { events: TicketEventDTO[] }) {
         ) : (
           <ol className="relative space-y-3 border-l pl-4">
             {sorted.map((e) => {
-              const Icon = ICONS[e.type] ?? History;
+              const Icon: LucideIcon = ICONS[e.type] ?? History;
               return (
                 <li key={e.id} className="relative">
                   <span className="absolute top-0.5 -left-[25px] flex size-4.5 items-center justify-center rounded-full border bg-background">

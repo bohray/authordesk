@@ -10,6 +10,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+export interface ConfirmDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  isPending?: boolean;
+  onConfirm: () => void;
+}
+
+/** Prefer `LazyConfirmDialog` at call sites: it keeps the dialog code out of the initial bundle. */
 export function ConfirmDialog({
   open,
   onOpenChange,
@@ -20,17 +33,7 @@ export function ConfirmDialog({
   destructive,
   isPending,
   onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  description?: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  destructive?: boolean;
-  isPending?: boolean;
-  onConfirm: () => void;
-}) {
+}: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(next) => onOpenChange(next)}>
       <DialogContent>

@@ -29,6 +29,14 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
 }
 
+/** Statuses that mean "this id doesn't point at anything you can see" (bad id, missing, not yours). */
+const NOT_FOUND_STATUSES: ReadonlySet<number> = new Set([400, 404, 422]);
+
+/** True when a detail page should show "not found" instead of a retryable error. */
+export function isNotFoundError(error: unknown): boolean {
+  return isApiError(error) && NOT_FOUND_STATUSES.has(error.status);
+}
+
 /** User-facing message for any thrown value. */
 export function getErrorMessage(error: unknown, fallback: string = MESSAGES.genericError): string {
   if (isApiError(error)) return error.message || fallback;

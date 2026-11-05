@@ -22,7 +22,7 @@ function oneOf<T extends string>(value: string | null, allowed: readonly T[]): T
   return value && (allowed as readonly string[]).includes(value) ? (value as T) : null;
 }
 
-function sameSet(a: readonly string[], b: readonly string[]) {
+export function sameSet(a: readonly string[], b: readonly string[]) {
   return a.length === b.length && a.every((x) => b.includes(x));
 }
 
