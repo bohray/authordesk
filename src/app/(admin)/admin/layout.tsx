@@ -9,6 +9,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       scope="admin"
       homeHref={routes.admin.tickets}
       nav={<AdminNav />}
+      // Agents care whether the queue is in sync; authors just see replies arrive.
+      showLiveStatus
       userMenu={<AccountMenu />}
     >
       {children}

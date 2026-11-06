@@ -20,8 +20,6 @@ export interface NavItem {
   icon: LucideIcon;
   /** Match exact path only (otherwise prefix match). */
   exact?: boolean;
-  /** Paths under `href` that should not mark this item active. */
-  exclude?: string[];
 }
 
 export const authorNavItems: NavItem[] = [
@@ -30,8 +28,6 @@ export const authorNavItems: NavItem[] = [
     href: routes.author.tickets,
     label: "My Tickets",
     icon: LifeBuoy,
-    // "New Ticket" has its own button, so it shouldn't highlight "My Tickets".
-    exclude: [routes.author.newTicket()],
   },
 ];
 

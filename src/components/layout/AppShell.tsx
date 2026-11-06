@@ -9,14 +9,16 @@ import { ThemeToggle } from "@/components/brand/ThemeToggle";
 import { appName } from "@/constants/ui";
 
 /**
- * Portal chrome: top bar with brand, nav, live indicator and user menu.
- * Also the single mount point for live updates in each portal.
+ * Portal chrome: top bar with brand, nav and user menu.
+ * Also the single mount point for live updates in each portal: updates always run;
+ * `showLiveStatus` only controls whether the sync badge is shown (ops-facing detail).
  */
 export function AppShell({
   scope,
   homeHref,
   nav,
   actions,
+  showLiveStatus = false,
   userMenu,
   children,
 }: {
@@ -24,6 +26,7 @@ export function AppShell({
   homeHref: string;
   nav: ReactNode;
   actions?: ReactNode;
+  showLiveStatus?: boolean;
   userMenu: ReactNode;
   children: ReactNode;
 }) {
@@ -47,7 +50,7 @@ export function AppShell({
           </Link>
           <div className="hidden h-full min-w-0 flex-1 md:block">{nav}</div>
           <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <LiveIndicator status={live.status} lastSyncedAt={live.lastSyncedAt} />
+            {showLiveStatus && <LiveIndicator status={live.status} lastSyncedAt={live.lastSyncedAt} />}
             {actions}
             <ThemeToggle />
             {userMenu}

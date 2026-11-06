@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import type { NavItem } from "@/constants/layout";
 
 function isNavItemActive(item: NavItem, pathname: string): boolean {
-  if (item.exclude?.some((p) => pathname.startsWith(p))) return false;
   return item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
 
