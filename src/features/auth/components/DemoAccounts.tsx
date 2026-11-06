@@ -45,7 +45,7 @@ function DemoAccountButton({
           </span>
         </span>
         <span className="block truncate font-mono text-xs text-muted-foreground">
-          {account.email} · {account.password}
+          {account.email}
         </span>
         <span className="block text-xs text-muted-foreground">{account.note}</span>
       </span>

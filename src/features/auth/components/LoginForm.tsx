@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/Input";
 import { Separator } from "@/components/ui/Separator";
 import { FormField, describedBy } from "@/components/forms/FormField";
+import { PasswordInput } from "@/components/forms/PasswordInput";
 import { DemoAccounts } from "@/features/auth/components/DemoAccounts";
 import { Wordmark } from "@/components/brand/Logo";
 import { useLogin } from "@/features/auth/hooks/useAuthMutations";
@@ -98,17 +99,21 @@ export function LoginForm() {
             <fieldset disabled={submitting} aria-busy={submitting} className="min-w-0 space-y-4">
               {loginFields.map((field) => {
                 const error = errors[field.name]?.message;
+                const inputProps = {
+                  id: field.name,
+                  autoComplete: field.autoComplete,
+                  placeholder: field.placeholder,
+                  "aria-invalid": !!error || undefined,
+                  "aria-describedby": describedBy(field.name, { error }),
+                  ...register(field.name),
+                };
                 return (
                   <FormField key={field.name} id={field.name} label={field.label} error={error}>
-                    <Input
-                      id={field.name}
-                      type={field.type}
-                      autoComplete={field.autoComplete}
-                      placeholder={field.placeholder}
-                      aria-invalid={!!error || undefined}
-                      aria-describedby={describedBy(field.name, { error })}
-                      {...register(field.name)}
-                    />
+                    {field.type === "password" ? (
+                      <PasswordInput {...inputProps} />
+                    ) : (
+                      <Input type={field.type} {...inputProps} />
+                    )}
                   </FormField>
                 );
               })}
