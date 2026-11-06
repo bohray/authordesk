@@ -13,10 +13,12 @@ const roleIcons = {
 function DemoAccountButton({
   account,
   selected,
+  disabled,
   onPick,
 }: {
   account: DemoAccount;
   selected: boolean;
+  disabled: boolean;
   onPick: (account: DemoAccount) => void;
 }) {
   const Icon = roleIcons[account.role];
@@ -25,8 +27,9 @@ function DemoAccountButton({
       type="button"
       onClick={() => onPick(account)}
       aria-pressed={selected}
+      disabled={disabled}
       className={cn(
-        "flex w-full items-start gap-3 rounded-lg border bg-background px-3 py-2 text-left interactive pressable hover:border-primary/25 hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+        "flex w-full items-start gap-3 rounded-lg border bg-background px-3 py-2 text-left interactive pressable hover:border-primary/25 hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60",
         selected && "border-primary/40 bg-primary/5 ring-1 ring-primary/20 dark:bg-primary/10",
       )}
     >
@@ -53,9 +56,12 @@ function DemoAccountButton({
 export function DemoAccounts({
   onPick,
   selectedEmail,
+  disabled = false,
 }: {
   onPick: (account: DemoAccount) => void;
   selectedEmail?: string;
+  /** True while signing in, so a click can't swap credentials mid-request. */
+  disabled?: boolean;
 }) {
   return (
     <section aria-labelledby="demo-accounts-heading" className="space-y-2">
@@ -68,7 +74,12 @@ export function DemoAccounts({
       <ul className="grid gap-2">
         {demoAccounts.map((account) => (
           <li key={account.email}>
-            <DemoAccountButton account={account} selected={selectedEmail === account.email} onPick={onPick} />
+            <DemoAccountButton
+              account={account}
+              selected={selectedEmail === account.email}
+              disabled={disabled}
+              onPick={onPick}
+            />
           </li>
         ))}
       </ul>

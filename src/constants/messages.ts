@@ -5,7 +5,7 @@ export const uiMessages = {
   sessionExpired: "Your session has expired. Please sign in again.",
 
   login: {
-    title: "Sign in to AuthorDesk",
+    title: "Sign in",
     subtitle: "Track your books, royalties and support requests in one place.",
   },
 

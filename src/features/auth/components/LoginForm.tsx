@@ -90,29 +90,36 @@ export function LoginForm() {
                 <AlertDescription>{serverError}</AlertDescription>
               </Alert>
             )}
-            {loginFields.map((field) => {
-              const error = errors[field.name]?.message;
-              return (
-                <FormField key={field.name} id={field.name} label={field.label} error={error}>
-                  <Input
-                    id={field.name}
-                    type={field.type}
-                    autoComplete={field.autoComplete}
-                    placeholder={field.placeholder}
-                    aria-invalid={!!error || undefined}
-                    aria-describedby={describedBy(field.name, { error })}
-                    {...register(field.name)}
-                  />
-                </FormField>
-              );
-            })}
-            <Button type="submit" className="h-9 w-full" disabled={submitting}>
-              {submitting && <Loader2 className="animate-spin" aria-hidden />}
-              {submitting ? "Signing in…" : "Sign in"}
-            </Button>
+            {/*
+              One `disabled` on the fieldset locks every field and the submit button natively
+              while signing in, so credentials can't change mid-request. Safe with RHF:
+              handleSubmit has already read the values before the request starts.
+            */}
+            <fieldset disabled={submitting} aria-busy={submitting} className="min-w-0 space-y-4">
+              {loginFields.map((field) => {
+                const error = errors[field.name]?.message;
+                return (
+                  <FormField key={field.name} id={field.name} label={field.label} error={error}>
+                    <Input
+                      id={field.name}
+                      type={field.type}
+                      autoComplete={field.autoComplete}
+                      placeholder={field.placeholder}
+                      aria-invalid={!!error || undefined}
+                      aria-describedby={describedBy(field.name, { error })}
+                      {...register(field.name)}
+                    />
+                  </FormField>
+                );
+              })}
+              <Button type="submit" className="h-9 w-full">
+                {submitting && <Loader2 className="animate-spin" aria-hidden />}
+                {submitting ? "Signing in…" : "Sign in"}
+              </Button>
+            </fieldset>
           </form>
           <Separator />
-          <DemoAccounts selectedEmail={email} onPick={handleDemoPick} />
+          <DemoAccounts selectedEmail={email} onPick={handleDemoPick} disabled={submitting} />
         </CardContent>
       </Card>
     </div>
