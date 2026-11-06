@@ -11,7 +11,7 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from "@/shared/constants/ticket";
-import { ticketCategoryOptions, ticketPriorityOptions } from "@/constants/adminTicket";
+import { ticketCategoryOptions } from "@/constants/adminTicket";
 import { uiMessages } from "@/constants/messages";
 import { routes } from "@/constants/routes";
 import type { AdminQueueQuery } from "@/types/queue";
@@ -55,7 +55,9 @@ export const queueSortOptions: FilterOption[] = queueSorts.map((s) => ({
 }));
 
 /** Filter keys rendered as a single-choice select with an "any" option. */
-export type QueueSelectFilterKey = "category" | "priority" | "assignee";
+// Priority isn't here on purpose: the stat cards above the queue are the priority filter
+// (they already show the counts), so a second Priority dropdown would duplicate them.
+export type QueueSelectFilterKey = "category" | "assignee";
 
 /** Config-driven select filters: rendered with one `.map()` in the filter bar. */
 export const queueSelectFilters: {
@@ -67,11 +69,6 @@ export const queueSelectFilters: {
     key: "category",
     label: "Category",
     options: withAny("All categories", ticketCategoryOptions),
-  },
-  {
-    key: "priority",
-    label: "Priority",
-    options: withAny("All priorities", ticketPriorityOptions),
   },
   {
     key: "assignee",
@@ -86,6 +83,38 @@ export const queueSelectFilters: {
   },
 ];
 
+/** Status views for the single-choice switch: exactly one is highlighted at a time. */
+export const queueStatusViews: { key: string; label: string; status: readonly TicketStatus[] }[] = [
+  { key: "unresolved", label: "Unresolved", status: defaultQueueStatus },
+  { key: "resolved", label: "Resolved", status: ["RESOLVED"] },
+  { key: "closed", label: "Closed", status: ["CLOSED"] },
+  { key: "all", label: "All", status: [] }, // empty = every status
+];
+
+/** Created-date presets; "custom" reveals the from/to inputs. */
+export const queueDatePresets = ["today", "last7", "last30"] as const;
+export type QueueDatePreset = (typeof queueDatePresets)[number];
+export const customDateValue = "custom";
+
+/** Days back from today (inclusive of today) for each preset. */
+export const queueDatePresetDays = {
+  today: 0,
+  last7: 6,
+  last30: 29,
+} as const satisfies Record<QueueDatePreset, number>;
+
+export const queueDatePresetLabels = {
+  today: "Today",
+  last7: "Last 7 days",
+  last30: "Last 30 days",
+} as const satisfies Record<QueueDatePreset, string>;
+
+export const queueDateOptions: FilterOption[] = [
+  { value: anyFilterValue, label: "Any time" },
+  ...queueDatePresets.map((p) => ({ value: p, label: queueDatePresetLabels[p] })),
+  { value: customDateValue, label: "Custom range…" },
+];
+
 /** Date range inputs; each one bounds the other so "from" can't be after "to". */
 export const queueDateFilters: {
   key: "from" | "to";
@@ -95,12 +124,6 @@ export const queueDateFilters: {
 }[] = [
   { key: "from", label: "From", bound: { attr: "max", key: "to" } },
   { key: "to", label: "To", bound: { attr: "min", key: "from" } },
-];
-
-/** One-click status presets shown before the individual status chips. */
-export const queueStatusPresets: { label: string; status: readonly TicketStatus[] }[] = [
-  { label: "Unresolved", status: defaultQueueStatus },
-  { label: "All", status: [] }, // empty = every status
 ];
 
 /** Query fields that count as "filtered" (sort and page don't). */

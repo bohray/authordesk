@@ -23,7 +23,6 @@ function StatsChip({
   icon,
   label,
   value,
-  valueClassName,
 }: {
   active: boolean;
   onClick: () => void;
@@ -31,15 +30,17 @@ function StatsChip({
   icon: ReactNode;
   label: string;
   value: number;
-  valueClassName?: string;
 }) {
   return (
     <button
       type="button"
       aria-pressed={active}
       className={cn(
-        "flex min-w-24 flex-1 flex-col items-start gap-0.5 rounded-lg border bg-background px-3 py-2 text-left interactive pressable hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-        active && "border-primary/50 bg-muted/60",
+        "flex min-w-28 flex-1 flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left interactive pressable focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+        // One selected style for every card, so "which filter is on" is never ambiguous.
+        active
+          ? "border-primary bg-primary/10 ring-1 ring-primary"
+          : "bg-background hover:border-primary/30 hover:bg-muted/50",
       )}
       onClick={onClick}
       title={title}
@@ -48,12 +49,14 @@ function StatsChip({
         {icon}
         {label}
       </span>
-      <span className={cn(statValueClass, valueClassName)}>{formatNumber(value)}</span>
+      <span className={cn(statValueClass, value === 0 && "text-muted-foreground")}>
+        {formatNumber(value)}
+      </span>
     </button>
   );
 }
 
-/** Open-ticket counts at a glance; each chip doubles as a quick filter. */
+/** Open-ticket counts per priority + unassigned. Each card is the filter for that value (click again to clear). */
 export function QueueStatsStrip({
   query,
   onFilter,
@@ -77,16 +80,10 @@ export function QueueStatsStrip({
     );
   }
 
-  // Includes UNCLASSIFIED, which has no priority chip of its own.
-  const totalOpen = Object.values(data.openByPriority).reduce((sum, n) => sum + (n ?? 0), 0);
   const unassignedActive = query.assignee === "unassigned";
 
   return (
     <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Open tickets summary">
-      <div className="flex min-w-24 flex-col justify-center rounded-lg bg-primary px-3 py-2 text-primary-foreground">
-        <span className="text-xs opacity-80">Open</span>
-        <span className={statValueClass}>{formatNumber(totalOpen)}</span>
-      </div>
       {ticketPriorities.map((p) => {
         const active = query.priority === p;
         const label = ticketPriorityLabels[p];
@@ -95,7 +92,7 @@ export function QueueStatsStrip({
             key={p}
             active={active}
             onClick={() => onFilter({ priority: active ? null : p })}
-            title={active ? "Clear priority filter" : `Show ${label.toLowerCase()} priority`}
+            title={active ? `Clear ${label.toLowerCase()} priority filter` : `Show ${label.toLowerCase()} priority`}
             icon={<span className={cn("size-2 rounded-full", priorityDotClasses[p])} aria-hidden />}
             label={label}
             value={data.openByPriority[p] ?? 0}
@@ -105,11 +102,11 @@ export function QueueStatsStrip({
       <StatsChip
         active={unassignedActive}
         onClick={() => onFilter({ assignee: unassignedActive ? null : "unassigned" })}
-        title="Show unassigned tickets"
-        icon={<UserX className="size-3" aria-hidden />}
+        title={unassignedActive ? "Clear unassigned filter" : "Show unassigned tickets"}
+        // Amber icon (not a loud number) flags work without an owner, so it doesn't outshout Critical.
+        icon={<UserX className={cn("size-3", data.unassigned > 0 && toneText.warn)} aria-hidden />}
         label={queueAssigneeLabels.unassigned}
         value={data.unassigned}
-        valueClassName={data.unassigned > 0 ? toneText.attention : undefined}
       />
     </div>
   );

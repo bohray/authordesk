@@ -9,7 +9,12 @@ import { UpdatingIndicator } from "@/components/common/LoadingState";
 import { Pagination } from "@/components/common/Pagination";
 import { queueEmptyCopy } from "@/constants/queue";
 import { useQueueFilters } from "@/features/admin-queue/hooks/useQueueFilters";
-import { useAdminTickets, usePrefetchAdminTicket } from "@/features/admin-queue/hooks/useAdminQueue";
+import {
+  useAdminStats,
+  useAdminTickets,
+  usePrefetchAdminTicket,
+} from "@/features/admin-queue/hooks/useAdminQueue";
+import { countOpenTickets } from "@/features/admin-queue/utils/openTickets";
 import { QueueFilters } from "@/features/admin-queue/components/QueueFilters";
 import { QueuePageHeader } from "@/features/admin-queue/components/QueuePageHeader";
 import { QueueTableSkeleton } from "@/features/admin-queue/components/QueueSkeletons";
@@ -22,6 +27,9 @@ export function TicketQueue() {
   const { data, isPending, isError, error, refetch, isRefetching, isPlaceholderData, isFetching } =
     useAdminTickets(query);
   const prefetch = usePrefetchAdminTicket();
+  // Same cached query the stats strip uses, so this adds no extra request.
+  const { data: stats } = useAdminStats();
+  const openCount = stats ? countOpenTickets(stats.openByPriority) : undefined;
   // Only true while showing the previous filter's rows; background polls don't dim the table.
   const isUpdating = isPlaceholderData && isFetching;
 
@@ -34,15 +42,9 @@ export function TicketQueue() {
 
   return (
     <>
-      <QueuePageHeader />
+      <QueuePageHeader openCount={openCount} />
       <QueueStatsStrip query={query} onFilter={setFilters} />
-      <QueueFilters
-        query={query}
-        onChange={setFilters}
-        onReset={handleReset}
-        isFiltered={isFiltered}
-        resetKey={resetKey}
-      />
+      <QueueFilters query={query} onChange={setFilters} onReset={handleReset} resetKey={resetKey} />
       {isPending ? (
         <QueueTableSkeleton />
       ) : isError ? (
