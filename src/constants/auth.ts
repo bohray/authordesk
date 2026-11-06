@@ -81,6 +81,7 @@ export const loginHighlights: { icon: LucideIcon; text: string }[] = [
 export const authMessages = {
   signInFailedTitle: "Couldn't sign you in",
   signOutFailed: "Couldn't sign out. Please try again.",
+  signingOut: "Signing you out…",
   supportTeamMeta: "Support team",
   authorCodeMeta: (code: string) => `Author code: ${code}`,
 } as const;
