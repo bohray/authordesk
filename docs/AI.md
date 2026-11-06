@@ -148,7 +148,7 @@ The guarantee: **ticket creation never depends on AI, and the queue is always so
 | 400/401/403 | Not retryable on the same provider (bad key or bad model). Move to the next provider |
 | Invalid JSON or schema mismatch | Logged as `BAD_RESPONSE` (the circuit breaker is not affected). Try the next provider, then one corrective retry, then the rule engine |
 | A provider keeps failing | **Circuit breaker**: after 3 consecutive failures the provider is skipped for 60s. After that, a single half-open probe is allowed: success closes the circuit, failure re-opens it |
-| Gemini fails | Groq (`llama-3.1-8b-instant`) takes over |
+| Gemini fails | Groq (`llama-3.1-8b-instant`) takes over **if `GROQ_API_KEY` is set**; otherwise straight to the rule engine / manual reply |
 | Everything fails | Classification gets rule values and `ai.status: FAILED`. The agent sees the reason, and the ticket is fully usable. The draft response is `{content:null, status:"UNAVAILABLE", message:"AI drafting is temporarily unavailable. Please write a reply manually."}` |
 | An admin override arrives while the LLM call is running | The ADMIN guard is in the **update filter** (a `bulkWrite` of 3 guarded updates), so a human value is never overwritten |
 | Database error mid-classification | Caught, and `ai.status` is set to FAILED on a best-effort basis. The caller never sees an exception |
@@ -167,7 +167,7 @@ It also uses the computed royalty facts: a long-overdue payout becomes CRITICAL,
 ## 6. Provider choice
 
 - **Gemini (primary)**: free tier, native **JSON-schema-constrained output** (`responseJsonSchema` with enums), cheap Flash-Lite for triage and Flash for writing, implicit prefix caching, and good multilingual handling for Indian authors.
-- **Groq (fallback)**: free tier, very low latency, OpenAI-compatible JSON mode. It is called through plain `fetch`, so it adds no SDK and no bundle weight.
+- **Groq (optional fallback)**: free tier, very low latency, OpenAI-compatible JSON mode. It is called through plain `fetch`, so it adds no SDK and no bundle weight. It is **off unless `GROQ_API_KEY` is set**, and the live demo runs without it (Gemini → rule engine). The fallback path is covered by unit tests with fake providers but hasn't been exercised against the real Groq API.
 - **Swappable**: both implement `LLMProvider { name, isConfigured(), modelFor(tier), generate(req) }`, and callers ask for a *tier* ("small" or "large"), not a model name. Adding OpenAI, Anthropic or a local model means writing one file and adding it to the chain. Tests inject fake providers through `setLLMClientOverrides`, so no test touches the network.
 
 ## 7. Prompt-injection guard

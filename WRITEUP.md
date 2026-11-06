@@ -18,7 +18,7 @@
 - **MongoDB with intentional embedding:**
   - Message threads are embedded in the ticket (bounded, read together).
   - Internal notes are kept in a separate collection, so they *cannot* leak to authors even if a projection is wrong.
-- **Free-tier LLMs (Gemini, then Groq) behind a provider interface.** Reviewers can run it at no cost, and swapping in Claude or GPT is one file. Below both sits a deterministic rule classifier, so the queue is always sorted and labelled even with zero AI.
+- **A free-tier LLM (Gemini) behind a provider interface.** Reviewers can run it at no cost, and swapping in Claude or GPT is one file. An optional second provider (Groq) slots into the same fallback chain when its key is set; the live demo runs without it. Below the LLMs sits a deterministic rule classifier, so the queue is always sorted and labelled even with zero AI.
 - **Admin overrides always win.** The AI never overwrites a human decision. Each original AI suggestion is stored, which gives an override rate: a free, continuous measure of classification accuracy.
 - **Out of scope for now:** real file upload, email notifications, password reset and a formal SLA engine. These are listed in the README with the next step for each.
 

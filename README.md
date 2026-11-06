@@ -41,7 +41,7 @@ All 10 authors from the provided dataset can log in with their dataset email and
 | Database | MongoDB Atlas (M0 free) via Mongoose 9 |
 | Validation | Zod 4: one set of schemas for API validation, client forms and OpenAPI docs |
 | Auth | Email/password (bcrypt), JWT in an httpOnly cookie, role-based access control |
-| AI | Google Gemini (free tier) → Groq (free tier) → local rule engine |
+| AI | Google Gemini (free tier) → local rule engine; optional Groq fallback when `GROQ_API_KEY` is set |
 | Real-time | Visibility-aware 5s polling of a tiny `/updates` delta endpoint |
 | Tests | Vitest + mongodb-memory-server (real MongoDB in-process) |
 | Hosting | Vercel + MongoDB Atlas |
@@ -144,7 +144,7 @@ src/
 | Drafted replies | Layered prompt: static persona, tone rules and hard rules first; then **only the KB section for that ticket's category** plus matching guidance examples; then a **facts block computed in code**; then the last few messages. |
 | Facts block | Next payout date, ₹1,000 threshold check, never-paid flag, production stage. The LLM never does arithmetic or invents dates. |
 | Cost | Category-scoped KB retrieval instead of the whole KB. Drafts **cached** per ticket and regenerated only on request or when the thread changes. Smallest model for classification. Output token caps. Every call logged with tokens and latency, shown on the admin dashboard. |
-| Failure handling | 10s timeout, exponential backoff on 429/5xx, Gemini → Groq fallback, a circuit breaker per provider, then a deterministic rule classifier. Tickets are always created, and admins can always reply manually. |
+| Failure handling | 10s timeout, exponential backoff on 429/5xx, fallback to a second provider when configured (Groq, optional; not enabled on the live demo), a circuit breaker per provider, then a deterministic rule classifier. Tickets are always created, and admins can always reply manually. |
 | Security | Keys only in server env (never `NEXT_PUBLIC_`). Author text is delimited and treated as data (prompt-injection guard). |
 | Model choice | Gemini 3.5 Flash-Lite / Flash on the **free tier**: reviewers can reproduce it at no cost, it supports native JSON schema output, and quality is good for short support replies. The `LLMProvider` interface makes switching to a paid Claude or OpenAI model a single-file change. |
 
