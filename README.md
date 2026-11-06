@@ -75,9 +75,22 @@ The app runs fully **without any AI key**. Classification falls back to the rule
 | `npm run lint` / `typecheck` | Quality gates (also run in CI) |
 
 ### Deploying (Vercel + Atlas)
-1. Create a free Atlas M0 cluster, a DB user, and allow network access from `0.0.0.0/0` (Vercel has no static IPs).
-2. Import the GitHub repo in Vercel. Set the env vars `MONGODB_URI`, `JWT_SECRET`, `PUBLISHER_NAME`, `GEMINI_API_KEY` (and optionally `GROQ_API_KEY`).
-3. Seed once from your machine: `MONGODB_URI="<atlas uri>" npm run seed`.
+1. **Atlas:** create a free M0 cluster and a database user, and allow network access from `0.0.0.0/0` (Vercel has no static IPs).
+2. **Seed once** from your machine: `MONGODB_URI="<atlas uri>" npm run seed`.
+3. **Vercel:** *Add New → Project → Import* the GitHub repo. The framework (Next.js), build command and output are detected automatically.
+4. **Environment variables** (Project → Settings → Environment Variables, for Production and Preview):
+
+   | Variable | Value |
+   |---|---|
+   | `MONGODB_URI` | Atlas connection string, including the `/authordesk` database name |
+   | `JWT_SECRET` | 32+ random characters: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
+   | `GEMINI_API_KEY` | Free key from https://aistudio.google.com/apikey |
+   | `PUBLISHER_NAME` | `Inkwell Publishing` |
+   | `GROQ_API_KEY` | *(optional)* backup AI provider |
+
+5. **Deploy**, then smoke-test both portals. Env var changes need a redeploy to take effect.
+
+The build needs no secrets (env is validated lazily at request time). The test-only `mongodb-memory-server` package has its binary download disabled in `package.json` (`config.mongodbMemoryServer.disablePostinstall`), so installs on Vercel stay fast; tests fetch the binary on first run instead.
 
 ---
 

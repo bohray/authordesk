@@ -63,5 +63,10 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "config": {
+    "mongodbMemoryServer": {
+      "disablePostinstall": "1"
+    }
   }
 }

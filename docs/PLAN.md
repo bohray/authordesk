@@ -1,5 +1,7 @@
 # Plan: AuthorDesk — Author Support & Communication Portal (Next.js + MongoDB)
 
+> **Original day-one plan, kept for reference.** Some file names and details changed during the build (for example, the PascalCase/camelCase naming convention and the refined queue filters). The README's *Architecture* section reflects the code as shipped.
+
 ## Context
 This is a 4-day take-home assignment. The portal has two sides: authors raise support tickets, and the admin/ops team answers them with AI help (auto-classification, priority scoring, drafted replies grounded in the knowledge base). It is seeded with the provided dataset of 10 authors and 18 books. Grading weights: AI 25%, Architecture/Code 25%, API 15%, Functionality 15%, Product 10%, Docs 10%.
 
