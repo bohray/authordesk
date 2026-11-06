@@ -37,19 +37,30 @@ function StatsChip({
       aria-pressed={active}
       className={cn(
         "flex min-w-28 flex-1 flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left interactive pressable focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-        // One selected style for every card, so "which filter is on" is never ambiguous.
+        // One selected style for every card: a single 1px primary border (no extra ring, which
+        // doubled the edge) and a faint tint; the label/number turn primary to carry the state.
         active
-          ? "border-primary bg-primary/10 ring-1 ring-primary"
+          ? "border-primary bg-primary/[0.06] dark:bg-primary/10"
           : "bg-background hover:border-primary/30 hover:bg-muted/50",
       )}
       onClick={onClick}
       title={title}
     >
-      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span
+        className={cn(
+          "flex items-center gap-1.5 text-xs",
+          active ? "font-medium text-primary" : "text-muted-foreground",
+        )}
+      >
         {icon}
         {label}
       </span>
-      <span className={cn(statValueClass, value === 0 && "text-muted-foreground")}>
+      <span
+        className={cn(
+          statValueClass,
+          active ? "text-primary" : value === 0 && "text-muted-foreground",
+        )}
+      >
         {formatNumber(value)}
       </span>
     </button>
