@@ -7,7 +7,7 @@ A two-sided support portal for a self-publishing house:
 
 > The publisher in this project is a fictional "Inkwell Publishing", configurable via `PUBLISHER_NAME`.
 
-**Live demo:** `<add Vercel URL>` · **API docs:** `<live URL>/docs` · **One-page write-up:** [WRITEUP.md](WRITEUP.md) · **AI design:** [docs/AI.md](docs/AI.md)
+**Live demo:** https://authordesk.vercel.app · **API docs:** https://authordesk.vercel.app/docs · **One-page write-up:** [WRITEUP.md](WRITEUP.md) · **AI design:** [docs/AI.md](docs/AI.md)
 
 ---
 
